@@ -1,7 +1,7 @@
 # Savi Nutrition — Production Ready & Secure
 
 Hosted deployment: **Namecheap shared hosting (cPanel + Passenger)** with two
-subdomains sharing one TiDB Cloud database.
+subdomains sharing one local SQLite database file (dmin/savi.db).
 
 - Admin portal: `https://admin.savinutritions.online`
 - User portal: `https://user.savinutritions.online`
@@ -11,9 +11,9 @@ subdomains sharing one TiDB Cloud database.
 
 | Path | What's inside | Why it must stay private | Protection |
 |------|---------------|--------------------------|------------|
-| `config/.env` | `DATABASE_URL` (TiDB password), `SECRET_KEY`, SMTP password | Secrets | `chmod 600`, outside every web root, `.gitignore: config/.env` |
+| `config/.env` | `SECRET_KEY`, SMTP password | Secrets | `chmod 600`, outside every web root, `.gitignore: config/.env` |
 | `.env` | Local/offline copy of the same secrets | Secrets | `chmod 600`, never committed |
-| `admin/savi.db` | Offline SQLite database (users, stock, purchases) | All business data | `.gitignore: *.db`, never inside a public folder |
+| `admin/savi.db` | The live SQLite database (users, stock, purchases) | All business data | `.gitignore: *.db`, outside both web roots, denied by `.htaccess` |
 | `uploads/` | Purchase bills, driver slips, sales invoices, product photos | Supplier/driver PII, financial proofs | Outside both web roots; served only by authenticated Flask routes with `send_from_directory` |
 | `backups/` | Daily Excel/PDF/JSON/ZIP backups | Full data export | `chmod 700`, `.gitignore` |
 | `*.log` | Request and server logs | May leak IPs and stack traces | `chmod 640`, never served |
@@ -44,15 +44,16 @@ Both web roots are `<repo>/admin` and `<repo>/user`, so `config/`, `uploads/`,
    SAMEORIGIN`, `Referrer-Policy: same-origin`, `Permissions-Policy`, a
    `Content-Security-Policy` for HTML responses, and HSTS when the request is
    HTTPS.
-4. **Database** — `DATABASE_URL` (`mysql+pymysql://...`) with `pool_pre_ping`;
-   SQLite fallback only for local/offline use. Both portals must point at the
-   same database.
+4. **Database** — SQLite file `admin/savi.db` on the hosting account (both
+   portals use the same file; `user/app.py` points at `../admin/savi.db`). If
+   `DATABASE_URL` is set it wins and MySQL is used instead, with
+   `pool_pre_ping`.
 5. **Login protection** — per-IP and per-login-id brute-force throttle
    (10 failures / 10 min, then a 10-minute lock), session id regeneration at
    login, absolute 12-hour session lifetime, and separate admin/user role gates.
 6. **Boot-time schema marker** — `schema_meta` records the schema version so the
    migration chain runs once per schema change instead of on every boot. This
-   keeps Passenger's start time around 10 seconds instead of 100+.
+   keeps Passenger's start time at 1–2 seconds.
    **Bump `_SCHEMA_VERSION` in `admin/app.py` and `user/app.py` whenever a
    `_migrate_*` helper changes.**
 7. **Debug off** — never run with `FLASK_DEBUG=1` on the server.

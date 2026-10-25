@@ -114,5 +114,8 @@ def configure(app_root: Path | None = None) -> dict[str, str]:
     if app_root is not None:
         shared_uploads = Path(app_root).resolve().parent / "uploads"
         os.environ.setdefault("UPLOAD_DIR", str(shared_uploads))
+        # Daily backups belong next to the app, not in the hosting account's
+        # home directory. backup_service.default_backup_dir() reads this.
+        os.environ.setdefault("SAVI_BACKUP_DIR", str(Path(app_root).resolve().parent / "backups"))
     ensure_directories(app_root)
     return applied

@@ -2,7 +2,9 @@
 
 Flask ERP with a separate **admin** and **user** portal that share one database.
 
-Hosted on **Namecheap (cPanel + Passenger)** with a **TiDB Cloud** database:
+Hosted on **Namecheap (cPanel + Passenger)** with **local-disk storage** — the
+database is the SQLite file `admin/savi.db` on the hosting account, and uploads
+live in `uploads/`. No external database service is involved.
 
 | Portal | URL | App root | Startup file |
 |--------|-----|----------|--------------|
@@ -14,8 +16,8 @@ Server setup instructions: **[`DEPLOY_NAMECHEAP.md`](DEPLOY_NAMECHEAP.md)**.
 ## Structure
 
 ```
-config/                 Shared secrets + uploads live OUTSIDE the web roots
-  .env                  DATABASE_URL, SECRET_KEY, SMTP (never committed)
+config/                 Shared secrets live OUTSIDE the web roots
+  .env                  SECRET_KEY, SMTP (never committed; no database URL)
   .env.example          Template that IS committed
 deploy_env.py           Loads config/.env for both Passenger entry points
 admin/                  Admin portal
@@ -78,7 +80,7 @@ Production settings come from `config/.env` (see `config/.env.example`):
 
 | Key | Meaning |
 |-----|---------|
-| `DATABASE_URL` | TiDB Cloud / MySQL connection string (**required**) |
+| `DATABASE_URL` | Leave **unset** — the apps then use the local `admin/savi.db`. Only set it for MySQL. |
 | `SECRET_KEY` | Session signing key, 32+ random characters (**required**) |
 | `SECURE_COOKIE` | `1` = HTTPS-only login cookies (on for the hosted site) |
 | `SAVI_NO_SEED` | `1` = never write demo data |

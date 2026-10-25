@@ -7,32 +7,37 @@ Target:
 | Admin | `https://admin.savinutritions.online` | `~/savi/admin` | `passenger_wsgi.py` |
 | User | `https://user.savinutritions.online` | `~/savi/user` | `passenger_wsgi.py` |
 
-The database stays exactly as it is today: **TiDB Cloud**, one shared database
-for both portals. No data is copied or restructured by this deployment.
+Storage is **local disk on the hosting account** — no external database:
+
+| What | Where |
+|------|-------|
+| Database | `~/savi/admin/savi.db` (SQLite, one file, shared by both portals) |
+| Uploads (photos, slips, invoices) | `~/savi/uploads/` |
+| Backups | `~/savi/backups/` |
+
+There is nothing to connect to, nothing to pay for, and no outbound port to
+open. The `savi.db` file that ships in the deployment zip already contains the
+current data (users, products, materials, stock, production history), so the
+hosted site starts with exactly the data you have locally.
+
+> Two things to remember: the whole website state lives in that one `.db`
+> file, so **download it regularly** (Admin → Settings → Daily Backup does it
+> automatically), and never let a deploy overwrite it with an older copy.
 
 ---
 
-## 0. Before you upload — check the server can reach TiDB
+## 0. Before you upload — check the package is intact
 
-TiDB Cloud listens on **port 4000**, not 3306. Many shared hosts block
-outbound ports, so test this first.
+The zip is `SAVI-Namecheap-Deploy.zip` (about 735 KB). After extracting it on
+the server you must see:
 
-cPanel → **Terminal** (or SSH):
-
-```bash
-python3 - <<'PY'
-import socket
-host = "gateway01.us-east-1.prod.aws.tidbcloud.com"
-try:
-    socket.create_connection((host, 4000), timeout=15).close()
-    print("OK: port 4000 reachable")
-except Exception as exc:
-    print("BLOCKED:", exc)
-PY
+```
+admin/   user/   config/   uploads/   deploy_env.py   requirements.txt
 ```
 
-If it prints `BLOCKED`, open a Namecheap support ticket and ask them to allow
-outbound TCP 4000 to that hostname. Nothing else will work until it does.
+and inside `admin/` both `passenger_wsgi.py` and **`savi.db`**. If `savi.db` is
+missing, the site would start empty — re-upload the zip instead of copying
+folders one by one.
 
 ---
 
@@ -49,32 +54,31 @@ Final layout on the server:
   deploy_env.py
   requirements.txt
   savi_file_storage.py
-  export_utils.py
-  admin/                 <- admin app root  (passenger_wsgi.py inside)
+  admin/                 <- admin app root  (passenger_wsgi.py + savi.db inside)
   user/                  <- user app root   (passenger_wsgi.py inside)
-  uploads/               <- created automatically, shared by both portals
+  uploads/               <- shared by both portals (photos, slips, invoices)
+  backups/               <- created automatically by the daily backup
 ```
 
 Upload options:
 
-- **cPanel → File Manager**: zip the project locally, upload the zip to
+- **cPanel → File Manager**: upload `SAVI-Namecheap-Deploy.zip` to
   `/home/USER/`, then **Extract**. Make sure the extracted folder is
   `/home/USER/savi` (not `savi apk` and not inside `public_html`).
 - **FTP/SFTP**: upload everything into `/home/USER/savi/`.
 
 Do **not** upload: `.git/`, `SaviNutrition-Production/`, `__pycache__/`,
-`__pycache__` files, `*.db`, `backups/`, `TiDB_backup*.json`,
-`Vercel_Env_Values.txt`, `AGENTS.md`.
+`AGENTS.md`, `Vercel_Env_Values.txt`, `TiDB_backup*.json`. (The zip already
+excludes all of them.)
 
 ---
 
-## 2. Create `config/.env`
+## 2. Check `config/.env`
 
-In cPanel → **File Manager**, copy `config/.env.example` to `config/.env`, then
-edit it:
+The zip already contains a working `.env` (the real `SECRET_KEY`, no database
+URL). You normally do **not** need to create it. Verify it looks like this:
 
 ```
-DATABASE_URL=mysql+pymysql://USER:PASSWORD@gateway01.us-east-1.prod.aws.tidbcloud.com:4000/test?ssl_verify_cert=true&ssl_verify_identity=true
 SECRET_KEY=<64 random hex characters>
 FLASK_ENV=production
 FLASK_DEBUG=0
@@ -82,10 +86,13 @@ SAVI_NO_SEED=1
 SECURE_COOKIE=1
 ```
 
-Then set permissions: right-click `config/.env` → **Change Permissions** →
-`600`.
+`DATABASE_URL` must stay **absent** — that is what makes both apps use the
+local `admin/savi.db`. Only set it if you ever move back to MySQL.
 
-Generate `SECRET_KEY` locally with:
+Then set permissions: right-click `config/.env` → **Change Permissions** →
+`600`. Do the same for `admin/savi.db` (should already be `644`).
+
+Generate a new `SECRET_KEY` locally with:
 
 ```bash
 python -c "import secrets; print(secrets.token_hex(32))"
@@ -139,15 +146,15 @@ pip install --upgrade pip
 pip install -r /home/USER/savi/requirements.txt
 ```
 
-If `cryptography` fails to build on the shared host, try:
+If pip complains about a compiler, install the binary wheels instead:
 
 ```bash
-pip install --only-binary=:all: cryptography
+pip install --only-binary=:all: -r /home/USER/savi/requirements.txt
 ```
 
-(`boto3` is **not** installed by default: it is only imported when S3 storage is
-configured. If you ever set `S3_BUCKET`, run `pip install boto3` in that
-virtualenv.)
+(`boto3` is **not** installed: it is only imported when S3 storage is
+configured, which this deployment never does. `PyMySQL`/`cryptography` are only
+used if you set `DATABASE_URL` back to MySQL — they are harmless to install.)
 
 ---
 
@@ -165,24 +172,16 @@ folder to point at; Flask serves the static files itself.
 
 Nameservers are already delegated to Namecheap, so no DNS change is needed.
 
-### 5b. Optional hardening (recommended)
+### 5b. Hardening file (already included)
 
-If the host ever serves a file directly (instead of passing it to Passenger),
-these rules stop source code, databases and logs from being downloaded. In
-cPanel → **File Manager**, edit the `.htaccess` that cPanel created inside
-`savi/admin` (and again in `savi/user`) and append this **outside** the
-`# CLOUDLINUX PASSENGER CONFIGURATION` block:
+Both `savi/admin/.htaccess` and `savi/user/.htaccess` ship in the zip. They stop
+Apache from ever handing out `savi.db`, `.env`, `*.py` or logs as static files,
+and turn off directory listings.
 
-```apache
-Options -Indexes
-<FilesMatch "\.(py|pyc|pyo|db|sqlite3?|log|bak|env|ini|toml|json)$">
-  Require all denied
-</FilesMatch>
-```
-
-If the site returns HTTP 500 after saving, the plan disallows `AllowOverride`
-for `Options` — remove the `Options -Indexes` line and keep the `FilesMatch`
-block.
+cPanel normally merges them with the `# CLOUDLINUX PASSENGER CONFIGURATION`
+block it writes itself. If a subdomain returns **HTTP 500** right after the
+upload, your plan disallows `Options` overrides: delete the `Options -Indexes`
+line from that `.htaccess` (keep the `FilesMatch` block) and reload.
 
 ---
 
@@ -202,8 +201,9 @@ While testing over http you may set `SECURE_COOKIE=0`, then change it back.
 cPanel → **Setup Python App** → **Restart** for each app.
 
 The first boot after a schema change runs the migration chain once. The
-`schema_meta` table records the version, so later boots take ~10 seconds
-instead of 100+.
+`schema_meta` table records the version, so later boots take 1–2 seconds
+instead of a minute. (Verified locally against this exact package: admin 1.3 s,
+user 1.1 s.)
 
 **After any template or `app.py` edit on the server, restart the application.**
 Flask runs non-debug, so compiled templates and imported modules are cached.
@@ -217,9 +217,12 @@ Open each URL and check:
 - [ ] `https://admin.savinutritions.online/login` loads with the padlock
 - [ ] Admin login works (6-digit ID + password)
 - [ ] `https://user.savinutritions.online/login` loads and a user account logs in
-- [ ] Existing data is visible (dashboard counts, resources, products)
+- [ ] Existing data is visible (dashboard counts, resources, products — the
+      SQLite file was shipped with your current data)
 - [ ] `https://admin.savinutritions.online/api/health` returns 200 with
-      `"storage": "local"`
+      `"storage": "local"` and `"database": "sqlite"`
+- [ ] Save something small (e.g. edit a stock value), reload → the change is
+      still there (proves `savi.db` is writable on the host)
 - [ ] Upload a product photo in the admin dashboard → it appears on **both**
       portals (proves the shared `uploads/` folder works)
 - [ ] Open a purchase invoice "View" link → the file is served
@@ -230,7 +233,7 @@ Open each URL and check:
 Health endpoint check from a terminal:
 
 ```bash
-curl -sI https://admin.savinutritions.online/api/health | head -1
+curl -s https://admin.savinutritions.online/api/health
 ```
 
 ---
@@ -248,17 +251,28 @@ cPanel → **Cron Jobs** → add two entries:
 ```
 
 Replace `3.11` with the Python version you chose. Backup files land in
-`/home/USER/savi/backups/<date>/` (Excel, PDF, JSON, ZIP).
+`/home/USER/savi/backups/<date>/` (Excel, PDF, JSON, ZIP — the ZIP contains a
+copy of `savi.db`).
 
 To also copy them off the server, set `backup_drive_dir` in Admin → Settings to
 a folder you sync (or leave blank for local-only).
 
 ---
 
+## 9b. Downloading the database on demand
+
+The whole website state is the single file `~/savi/admin/savi.db`. To take a
+snapshot, either press **Backup Now** in Admin → Settings (the ZIP in
+`backups/<date>/` contains it) or download the file directly in File Manager.
+Restoring is the same in reverse: upload the `.db` over the existing one while
+both applications are stopped, then restart them.
+
+---
+
 ## 10. Updating the site later
 
 1. Upload the changed files over the existing ones.
-2. **Never overwrite** `config/.env` or `uploads/`.
+2. **Never overwrite** `config/.env`, `admin/savi.db` or `uploads/`.
 3. If any `_migrate_*` helper changed, bump `_SCHEMA_VERSION` in
    `admin/app.py` **and** `user/app.py`.
 4. Restart both applications.
@@ -280,16 +294,17 @@ then re-upload (or `git pull` on the server if you cloned it there).
 | Symptom | Cause / fix |
 |---------|-------------|
 | 503 / "Passenger could not start" | Check the app's error log in cPanel. Usually a missing dependency (`pip install -r requirements.txt`) or a syntax error. |
-| First page load takes >90s then 504 | Migrations are running against TiDB. Confirm `schema_meta` exists and its `version` equals `_SCHEMA_VERSION`. |
-| `Can't connect to MySQL server` | Outbound port 4000 blocked (step 0), or a wrong `DATABASE_URL`. |
+| First page load takes a minute, then fast | Normal once: the migration chain runs on the first boot and stamps `schema_meta`. |
+| Site starts with no data / empty dashboard | `admin/savi.db` did not survive the upload (zip not extracted, or folders copied by hand). Re-upload the zip and extract it into `~/savi`. |
+| `attempt to write a readonly database` | `savi.db` or its folder is not writable. Set the file to `644` and `~/savi/admin` to `755`. |
 | `RuntimeError: SECRET_KEY must be...` | `config/.env` is missing, not readable, or the key is shorter than 32 chars. |
 | Login returns to the login page | `SECURE_COOKIE=1` without HTTPS. Run AutoSSL, or set it to `0` temporarily. |
 | Login works, then instantly logged out | Same cookie issue, or the browser blocks cookies for the domain. |
 | Uploads 503 "Durable upload storage is not configured" | `UPLOAD_DIR` points somewhere unwritable. Check permissions on `savi/uploads` (755/775). |
 | Uploaded photo not visible on the other portal | Both apps must share `UPLOAD_DIR`; the loader sets it to `<repo>/uploads` automatically. |
-| "Data Updated" dialog keeps appearing | The two apps must point at the **same** database. Compare `DATABASE_URL`. |
+| "Data Updated" dialog keeps appearing | The two apps must point at the **same** database file. Confirm `admin/savi.db` exists and `DATABASE_URL` is unset. |
+| HTTP 500 immediately after upload | The `.htaccess` `Options -Indexes` line is not allowed on this plan — delete that line (see step 5b). |
 | Changes to templates do nothing | Restart the application (step 7). |
-| 500 with `Duplicate column name` at boot | Harmless race when admin and user boot together; the app logs it and continues. |
 
 ---
 
@@ -300,5 +315,8 @@ then re-upload (or `git pull` on the server if you cloned it there).
 - the generated `public/` static tree
 - `[tool.vercel]` from `pyproject.toml`
 - all Vercel documentation
+- the TiDB Cloud dependency: the database is now the local SQLite file
+  `admin/savi.db`, so no external database, no port-4000 outbound rule and no
+  monthly database bill
 
-Nothing in the database, templates, models or business logic changed.
+Nothing in the templates, models or business logic changed.
