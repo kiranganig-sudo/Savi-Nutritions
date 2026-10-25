@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Orders{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Sales Orders</span></div>
+        <h1 class="page-title">Sales Orders</h1>
+    </div>
+    <button class="btn btn-primary" type="button" onclick="alert('New orders will be connected during backend integration.')"><i class="fas fa-plus"></i> New Order</button>
+</div>
+
+<div class="card">
+    <div class="card-header" style="flex-direction:column;align-items:stretch;">
+        <div class="tabs">
+            <button class="tab {% if status_filter == 'all' %}active{% endif %}" onclick="filterOrders('all')">
+                All Orders <span class="count">{{ all_orders|length }}</span>
+            </button>
+            <button class="tab {% if status_filter == 'Pending' %}active{% endif %}" onclick="filterOrders('Pending')">
+                Pending <span class="count">{{ all_orders|selectattr('status','equalto','Pending')|list|length }}</span>
+            </button>
+            <button class="tab {% if status_filter == 'Allocated' %}active{% endif %}" onclick="filterOrders('Allocated')">
+                Allocated <span class="count">{{ all_orders|selectattr('status','equalto','Allocated')|list|length }}</span>
+            </button>
+            <button class="tab {% if status_filter == 'In Transit' %}active{% endif %}" onclick="filterOrders('In Transit')">
+                In Transit <span class="count">{{ all_orders|selectattr('status','equalto','In Transit')|list|length }}</span>
+            </button>
+            <button class="tab {% if status_filter == 'Delivered' %}active{% endif %}" onclick="filterOrders('Delivered')">
+                Delivered <span class="count">{{ all_orders|selectattr('status','equalto','Delivered')|list|length }}</span>
+            </button>
+            <button class="tab {% if status_filter == 'Cancelled' %}active{% endif %}" onclick="filterOrders('Cancelled')">
+                Cancelled <span class="count">{{ all_orders|selectattr('status','equalto','Cancelled')|list|length }}</span>
+            </button>
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;padding-top:12px;">
+            <div class="filter-input">
+                <i class="fas fa-search"></i>
+                <input type="text" placeholder="Search orders..." oninput="searchTable(this.closest('.filter-input').querySelector('input'),'ordersTable')">
+            </div>
+            <div class="filter-input">
+                <i class="fas fa-calendar"></i>
+                <input type="date" value="2026-09-04">
+            </div>
+            <button class="btn btn-secondary btn-sm" type="button" onclick="exportTable('ordersTable','sales_orders_export')"><i class="fas fa-download"></i> Export</button>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="ordersTable">
+            <thead>
+                <tr>
+                    <th>Order ID</th>
+                    <th>Customer</th>
+                    <th>Store</th>
+                    <th>Order Date</th>
+                    <th>Required Date</th>
+                    <th>Status</th>
+                    <th>Total Items</th>
+                    <th>Total (₹)</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in orders %}
+                <tr>
+                    <td><strong>{{ loop.index }}</strong></td>
+                    <td><strong>{{ order.customer }}</strong></td>
+                    <td>{{ order.store }}</td>
+                    <td>{{ order.date }}</td>
+                    <td>{{ order.required }}</td>
+                    <td>
+                        {% if order.status == 'Pending' %}
+                        <span class="badge badge-warning"><i class="fas fa-clock"></i> {{ order.status }}</span>
+                        {% elif order.status == 'Allocated' %}
+                        <span class="badge badge-info"><i class="fas fa-check"></i> {{ order.status }}</span>
+                        {% elif order.status == 'In Transit' %}
+                        <span class="badge badge-primary"><i class="fas fa-truck"></i> {{ order.status }}</span>
+                        {% elif order.status == 'Delivered' %}
+                        <span class="badge badge-success"><i class="fas fa-check-double"></i> {{ order.status }}</span>
+                        {% else %}
+                        <span class="badge badge-danger"><i class="fas fa-times"></i> {{ order.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ order.items }}</td>
+                    <td><strong>₹{{ "{:,}".format(order.total) }}</strong></td>
+                    <td>
+                        <div class="action-dropdown">
+                            <button class="action-btn" onclick="toggleDropdown(event, this)"><i class="fas fa-ellipsis-v"></i></button>
+                            <div class="dropdown-menu">
+                                <button class="dropdown-item" type="button" onclick="alert('Order details will be connected during backend integration.')"><i class="fas fa-eye"></i> View Details</button>
+                                <button class="dropdown-item" type="button" onclick="window.print()"><i class="fas fa-print"></i> Print Invoice</button>
+                                {% if order.status == 'Pending' %}
+                                <button class="dropdown-item" onclick="setStatus('{{ order.id }}','Allocated')"><i class="fas fa-check"></i> Allocate</button>
+                                {% elif order.status == 'Allocated' %}
+                                <button class="dropdown-item" onclick="setStatus('{{ order.id }}','In Transit')"><i class="fas fa-truck"></i> Ship</button>
+                                {% elif order.status == 'In Transit' %}
+                                <button class="dropdown-item" onclick="setStatus('{{ order.id }}','Delivered')"><i class="fas fa-check-double"></i> Deliver</button>
+                                {% endif %}
+                                <div class="dropdown-divider"></div>
+                                <button class="dropdown-item" style="color:#d32f2f;" onclick="setStatus('{{ order.id }}','Cancelled')"><i class="fas fa-times"></i> Cancel</button>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="pagination" style="padding:16px 20px;">
+        <div class="pagination-info">Showing {{ orders|length }} of {{ all_orders|length }} orders</div>
+        <div class="pagination-buttons">
+            <button class="pagination-btn"><i class="fas fa-chevron-left"></i></button>
+            <button class="pagination-btn active">1</button>
+            <button class="pagination-btn">2</button>
+            <button class="pagination-btn"><i class="fas fa-chevron-right"></i></button>
+        </div>
+    </div>
+</div>
+{% endblock %}

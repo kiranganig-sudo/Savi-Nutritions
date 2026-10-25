@@ -1,0 +1,32 @@
+# Python caches and compiled files
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+temp_web_env/
+
+# Local configuration and runtime files
+.env
+.env.*
+!.env.example
+*.log
+
+# SQLite runtime database
+*.db
+*.sqlite
+instance/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

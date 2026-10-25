@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Product Details{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Product Details</span></div>
+        <h1 class="page-title">Product Details</h1>
+        <div class="page-subtitle">Finished-goods stock produced by Production Updates, minus Product Sales.</div>
+    </div>
+    <div class="export-actions" style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" type="button" onclick="exportTable('productionStockTable','production_stock_export')"><i class="fas fa-download"></i> Export</button>
+        <button class="btn btn-primary" type="button" id="prodToggleBtn" onclick="toggleThirdParty()"><i class="fas fa-boxes-stacked"></i> Show 3rd Party Products</button>
+    </div>
+</div>
+<div class="card" id="productsCard">
+    <div class="card-header">
+        <div class="card-title">Products <span style="font-weight:400;color:#66756c;">({{ products|length }})</span></div>
+        <div class="filter-bar">
+            <div class="filter-input"><i class="fas fa-search"></i><input type="text" placeholder="Search products..." oninput="searchTable(this,'productionStockTable')" aria-label="Search products"></div>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="productionStockTable">
+            <thead><tr><th>Sl.No</th><th>Product</th><th>Stock (bags)</th><th>Status</th><th>Last Update</th></tr></thead>
+            <tbody>
+            {% for p in products %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td><strong>{{ p.name }}</strong></td>
+                    <td>{{ p.stock }}</td>
+                    <td>{% if p.status == 'In Stock' %}<span class="badge badge-success">{{ p.status }}</span>{% elif p.status == 'Low Stock' %}<span class="badge badge-warning">{{ p.status }}</span>{% else %}<span class="badge badge-danger">{{ p.status }}</span>{% endif %}</td>
+                    <td>{{ p.last_update or '—' }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="5"><div class="empty-state"><i class="fas fa-industry"></i><h3>No products found</h3><p>Products created by the admin will appear here.</p></div></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card" id="thirdPartyCard" style="display:none;">
+    <div class="card-header">
+        <div class="card-title">3rd Party Products <span style="font-weight:400;color:#66756c;">({{ third_items|length }})</span></div>
+        <div class="filter-bar">
+            <div class="filter-input"><i class="fas fa-search"></i><input type="text" placeholder="Search 3rd party products..." oninput="searchTable(this,'thirdPartyStockTable')" aria-label="Search 3rd party products"></div>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="thirdPartyStockTable">
+            <thead><tr><th>Sl.No</th><th>Product</th><th>Stock</th><th>Status</th><th>Last Update</th></tr></thead>
+            <tbody>
+            {% for t in third_items %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td><strong>{{ t.name }}</strong></td>
+                    <td>{{ t.stock }}</td>
+                    <td>{% if t.status == 'Good' %}<span class="badge badge-success">{{ t.status }}</span>{% elif t.status == 'Low Stock' %}<span class="badge badge-warning">{{ t.status }}</span>{% else %}<span class="badge badge-danger">{{ t.status }}</span>{% endif %}</td>
+                    <td>{{ t.last_update or '—' }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="5"><div class="empty-state"><i class="fas fa-boxes-stacked"></i><h3>No 3rd party products</h3><p>3rd party products added by the admin will appear here.</p></div></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+let showingThirdParty = false;
+function toggleThirdParty(){
+  showingThirdParty = !showingThirdParty;
+  document.getElementById('productsCard').style.display = showingThirdParty ? 'none' : '';
+  document.getElementById('thirdPartyCard').style.display = showingThirdParty ? '' : 'none';
+  const btn = document.getElementById('prodToggleBtn');
+  btn.innerHTML = showingThirdParty
+    ? '<i class="fas fa-industry"></i> Show Products'
+    : '<i class="fas fa-boxes-stacked"></i> Show 3rd Party Products';
+}
+</script>
+{% endblock %}

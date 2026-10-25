@@ -1,0 +1,397 @@
+{% extends "base.html" %}
+{% block title %}Resource Management - {{ resource_category }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Resource Management</span> <i class="fas fa-chevron-right"></i> <span>{{ resource_category }}</span></div>
+    <h1 class="page-title">{{ resource_category }}</h1>
+  </div>
+  <div class="export-actions" style="display:flex;gap:8px;align-items:center;">
+    <button class="btn btn-primary" onclick="openBulkEdit()"><i class="fas fa-pen-to-square"></i> EDIT ALL STOCKS</button>
+    <button class="btn btn-primary" onclick="openAddNewMaterial()"><i class="fas fa-plus"></i> ADD NEW MATERIAL</button>
+    <button class="btn btn-secondary" onclick="exportTable('resourceTable','resource_maintenance_export')"><i class="fas fa-download"></i> Export Report</button>
+  </div>
+</div>
+
+<style>
+/* Clear per-row stock status tinting: Good = green, Low = amber,
+   Critical = red. The row colour matches the dashboard slide-graph
+   colours so the same status always reads the same way. */
+.res-legend{display:flex;gap:12px;font-size:11px;color:var(--text-medium);flex-wrap:wrap;align-items:center;margin-left:auto;}
+.res-legend .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:middle;}
+#resourceTable tbody tr.st-row-ok{background:#f1faf3;}
+#resourceTable tbody tr.st-row-ok td:first-child{box-shadow:inset 4px 0 0 #2e9e4f;}
+#resourceTable tbody tr.st-row-low{background:#fff8e9;}
+#resourceTable tbody tr.st-row-low td:first-child{box-shadow:inset 4px 0 0 #f0a51e;}
+#resourceTable tbody tr.st-row-crit{background:#fdeeed;}
+#resourceTable tbody tr.st-row-crit td:first-child{box-shadow:inset 4px 0 0 #e0393c;}
+#resourceTable tbody tr.st-row-ok:hover{background:#e6f6ea;}
+#resourceTable tbody tr.st-row-low:hover{background:#fdf1d9;}
+#resourceTable tbody tr.st-row-crit:hover{background:#fbe3e2;}
+/* Item names carry a LIGHT BLUE chip so the item itself is never confused
+   with its stock status: the status colour lives on the row tint, the
+   status badge and the graph value, the name is always light blue. */
+#resourceTable .item-chip{display:inline-block;background:#e7f1fa;color:#15599c;border:1px solid #cfe2f3;border-radius:6px;padding:2px 8px;font-weight:700;max-width:100%;word-break:break-word;}
+#bulkEditModal .bulk-row .item-chip{background:#eef5fc;color:#15599c;border-color:#dbe9f6;}
+</style>
+
+<div class="card">
+  <div class="card-header">
+    <div class="filter-bar">
+      <div class="filter-input"><i class="fas fa-search"></i><input id="resourceSearch" type="text" placeholder="Search items..." oninput="filterResources()"></div>
+      <span class="res-legend">
+        <span><span class="dot" style="background:#2e9e4f;"></span>Good</span>
+        <span><span class="dot" style="background:#f0a51e;"></span>Low Stock</span>
+        <span><span class="dot" style="background:#e0393c;"></span>Critical</span>
+      </span>
+    </div>
+  </div>
+  <div class="table-container">
+    <table class="data-table" id="resourceTable">
+      <thead><tr><th>ID</th><th>Item</th><th>Category</th><th>Stock</th><th>Status</th><th>Last Update</th><th>Action</th></tr></thead>
+      <tbody>
+      {% for item in resources %}
+        <tr class="{% if item.status == 'Good' %}st-row-ok{% elif item.status == 'Low Stock' %}st-row-low{% else %}st-row-crit{% endif %}" data-status="{{ item.status }}" data-id="{{ item.id }}" data-name="{{ item.name }}" data-group="{{ item.group }}" data-unit="{{ item.unit }}" data-formula="{{ item.opening|int }} + {{ (item.purchased or 0)|int }} - {{ item.consumed|int }} - {{ (item.sold or 0)|int }}">
+          <td><strong>{{ loop.index }}</strong></td>
+          <td><span class="item-chip">{{ item.name }}</span><div style="font-size:11px;color:var(--text-light);margin-top:3px;">Unit: {{ item.unit }}</div></td>
+          <td>{{ item.category }}</td>
+          <td class="stock-cell"><strong>{{ "{:,}".format(item.closing) }} {{ item.unit }}</strong></td>
+          <td><span class="badge {% if item.status == 'Good' %}badge-success{% elif item.status == 'Low Stock' %}badge-warning{% else %}badge-danger{% endif %}">{{ item.status }}</span></td>
+          <td><div style="font-size:12px;"><i class="fas fa-clock" style="margin-right:5px;"></i>{{ item.last_update }}</div></td>
+          <td><button class="btn btn-sm btn-primary" onclick="editStock(this)">Edit Stock</button> <button class="btn btn-sm btn-danger" onclick="deleteMaterial(this)">Delete</button></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="newMaterialModal" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.45);align-items:center;justify-content:center;z-index:100;padding:20px;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:460px;padding:22px;">
+    <h3 style="margin:0 0 4px;">Add New Material</h3>
+    <p style="font-size:12px;color:#66756c;margin:0 0 16px;">Item name and stock accept only 40 characters (letters + numbers for the name, numbers for the stock). Longer values are refused with an "excessive value" message. Status and last update are filled automatically.</p>
+    <div class="form-group"><label class="form-label">Item name * <span style="font-weight:400;color:#8a9a90;">(max 40 characters)</span></label>
+      <input class="form-control" id="matName" required placeholder="e.g. Rice" autocomplete="off">
+      <div id="matNameHint" style="font-size:12px;min-height:16px;margin-top:4px;color:#8a9a90;"></div></div>
+    <div class="form-group"><label class="form-label">Category *</label>
+      <select class="form-control" id="matCategory">
+        <option value="Raw Materials">Raw Materials</option>
+        <option value="Chemicals">Chemicals</option>
+        <option value="Medicines">Medicines</option>
+      </select></div>
+    <div class="form-group"><label class="form-label">Stock * <span style="font-weight:400;color:#8a9a90;">(max 40 digits)</span></label>
+      <input class="form-control" id="matStock" type="text" inputmode="numeric" min="0" step="1" required placeholder="Opening stock" autocomplete="off">
+      <div id="matStockHint" style="font-size:12px;min-height:16px;margin-top:4px;color:#8a9a90;"></div></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+      <button class="btn btn-secondary" onclick="closeModal('newMaterialModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveNewMaterial()"><i class="fas fa-save"></i> Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="resourceModal" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.45);align-items:center;justify-content:center;z-index:100;padding:20px;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:520px;padding:22px;">
+    <h3 style="margin:0 0 4px;">Add Resource</h3>
+    <p style="font-size:12px;color:#66756c;margin:0 0 16px;">Saved to SQLite — stock status is calculated automatically.</p>
+    <div class="form-group"><label class="form-label">Item name *</label>
+      <select class="form-control" id="resName" onchange="toggleResNew(this)">
+        <option value="" selected disabled>Select item from {{ resource_category|lower }} list</option>
+        {% for item in resources %}
+        <option value="{{ item.name }}" data-closing="{{ item.closing }}" data-unit="{{ item.unit }}">{{ item.name }}</option>
+        {% endfor %}
+        <option value="__new">➕ New item (type name below)</option>
+      </select></div>
+    <div class="form-group" id="resNewWrap" style="display:none;"><label class="form-label">New item name *</label><input class="form-control" id="resNameNew" placeholder="Type new item name"></div>
+    <div class="form-group" id="resStockWrap" style="display:none;"><label class="form-label">Initial stock (kg) *</label><input class="form-control" id="resStock" type="number" min="0" step="1" value="0"></div>
+    <div class="form-group" id="resExistInfo" style="display:none;"><div style="background:#f5f9f6;border:1px dashed #cfe3d4;border-radius:9px;padding:10px 12px;font-size:12.5px;color:#55605b;"><i class="fas fa-lock" style="margin-right:6px;"></i>Current stock: <strong id="resExistStock">—</strong> — it stays unchanged when you save. Use <em>Edit Stock</em> or <em>EDIT ALL STOCKS</em> to change quantities.</div></div>
+    <div class="form-group"><label class="form-label">Sub category</label><input class="form-control" id="resCategory" placeholder="e.g. Cereal / Energy source"></div>
+    <div class="form-group"><label class="form-label">Min stock</label><input class="form-control" id="resMin" type="number" value="250" min="0"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+      <button class="btn btn-secondary" onclick="closeModal('resourceModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveResource()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="bulkEditModal" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.45);align-items:center;justify-content:center;z-index:100;padding:20px;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:560px;padding:22px;">
+    <h3 style="margin:0 0 4px;">Edit All Stocks — {{ resource_category }}</h3>
+    <p style="font-size:12px;color:#66756c;margin:0 0 14px;">Change any stock numbers below and save once. Items you leave untouched stay exactly as they are. Whole numbers only.</p>
+    <div style="max-height:55vh;overflow:auto;border:1px solid var(--border);border-radius:10px;">
+      {% for item in resources %}
+      <div class="bulk-row" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);" data-name="{{ item.name }}" data-group="{{ item.group }}">
+        <span class="item-chip" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ item.name }}">{{ item.name }}</span>
+        <span style="font-size:11px;color:var(--text-light);width:40px;text-align:right;">{{ item.unit }}</span>
+        <input type="number" min="0" step="1" class="form-control" style="width:120px;" value="{{ item.closing|default(0, true) }}" data-init="{{ item.closing|default(0, true) }}">
+      </div>
+      {% else %}
+      <div style="padding:18px;text-align:center;color:#66756c;font-size:13px;">No items in this category yet.</div>
+      {% endfor %}
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+      <button class="btn btn-secondary" onclick="closeModal('bulkEditModal')">Cancel</button>
+      <button class="btn btn-primary" id="bulkEditSaveBtn" onclick="saveBulkEdit()"><i class="fas fa-save"></i> Save All</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const RES_EXIST = {{ resource_names|tojson }};
+/* Shared 40-character input limit for item name + stock (mirrors the
+   server-side RESOURCE_FIELD_MAX_CHARS guard in admin/app.py). */
+const RES_FIELD_MAX_CHARS = 40;
+function filterResources(){
+  /* shared engine (main.js): comma-insensitive numbers, multi-word AND,
+     ignores button labels, shows a "No matching records" row + a live count */
+  saviSearchRows('resourceTable','resourceSearch');
+}
+function openAddNewMaterial(){
+  document.getElementById('matName').value='';
+  document.getElementById('matStock').value='0';
+  document.getElementById('matCategory').value="{{ resource_category }}";
+  document.getElementById('newMaterialModal').style.display='flex';
+  setTimeout(function(){document.getElementById('matName').focus();},80);
+}
+/* Input-time restrictions for the Add New Material modal: an invalid keystroke
+   or a paste is REFUSED as it happens and announced in the field's hint line -
+   it is never silently cut off or auto-corrected (same rule as the login ID
+   fields). saveNewMaterial() keeps its own checks as a backstop. */
+function bindResourceField(el, hintId, opts){
+  if(!el || el.dataset.resBound) return;
+  el.dataset.resBound = '1';
+  const hint = document.getElementById(hintId);
+  const idle = hint ? (hint.textContent || '') : '';
+  const baseColor = hint ? (hint.style.color || '') : '';
+  let timer = null;
+  function show(msg){
+    if(!hint) return;
+    hint.textContent = msg;
+    hint.style.color = '#c0392b';
+    clearTimeout(timer);
+    timer = setTimeout(function(){ hint.textContent = idle; hint.style.color = baseColor; }, 4000);
+  }
+  function clear(){
+    if(!hint) return;
+    clearTimeout(timer);
+    hint.textContent = idle;
+    hint.style.color = baseColor;
+  }
+  function check(str){
+    if(!str) return '';
+    if(opts.digits && !/^[0-9]+$/.test(str)) return 'Numbers only - letters are refused.';
+    if(opts.regex && !opts.regex.test(str)) return opts.regexMsg;
+    if(str.length > opts.max){
+      return 'Only ' + opts.max + ' characters allowed - a ' + (str.length - opts.max)
+           + ' character overflow is refused before it is typed.';
+    }
+    return '';
+  }
+  el.addEventListener('beforeinput', function(e){
+    const it = String(e.inputType || '');
+    // deleting / undo-redo always allowed
+    if(it.indexOf('delete') === 0 || it.indexOf('history') === 0) return;
+    const start = el.selectionStart == null ? el.value.length : el.selectionStart;
+    const end = el.selectionEnd == null ? el.value.length : el.selectionEnd;
+    let typed = '';
+    if(it === 'insertFromPaste' || it === 'insertFromDrop'){
+      const dt = e.dataTransfer;
+      typed = dt ? String(dt.getData('text') || '') : '';
+    } else {
+      typed = e.data == null ? '' : String(e.data);
+    }
+    const next = el.value.slice(0, start) + typed + el.value.slice(end);
+    const err = check(next);
+    if(err){ e.preventDefault(); show(err); } else { clear(); }
+  });
+  el.addEventListener('input', function(){
+    // safety net for anything the browser let through (autofill, IME)
+    const err = check(el.value);
+    if(err) show(err); else clear();
+  });
+}
+bindResourceField(document.getElementById('matName'), 'matNameHint',
+  {max:RES_FIELD_MAX_CHARS, regex:/^[A-Za-z0-9][A-Za-z0-9 %()+.\/&,-]*$/,
+   regexMsg:'Only letters, numbers, spaces and % - ( ) . / & , are allowed.'});
+bindResourceField(document.getElementById('matStock'), 'matStockHint',
+  {max:RES_FIELD_MAX_CHARS, digits:true});
+
+async function saveNewMaterial(){
+  const name=document.getElementById('matName').value.trim();
+  const category=document.getElementById('matCategory').value;
+  const stock=document.getElementById('matStock').value;
+  if(!name){ alert('Item name is required.'); return; }
+  /* Input restriction: the item name allows letters + numbers, the stock only
+     numbers, and BOTH are capped at 40 characters. Typing is never silently
+     cut off - an excessive value is refused with a clear message. */
+  if(name.length>RES_FIELD_MAX_CHARS){
+    alert('Item name/Stock value is excessive - only '+RES_FIELD_MAX_CHARS+' characters are allowed (you typed '+name.length+').');
+    document.getElementById('matName').focus(); return;
+  }
+  if(!/^[A-Za-z0-9][A-Za-z0-9 %()+.\/&,-]*$/.test(name)){
+    alert('Item name allows only letters, numbers, spaces and the characters % - ( ) . / & ,');
+    document.getElementById('matName').focus(); return;
+  }
+  if(stock===''||!Number.isInteger(Number(stock))||Number(stock)<0){ alert('Stock must be a whole number.'); return; }
+  if(String(stock).length>RES_FIELD_MAX_CHARS){
+    alert('Item name/Stock value is excessive - only '+RES_FIELD_MAX_CHARS+' digits are allowed.');
+    document.getElementById('matStock').focus(); return;
+  }
+  const body={group:category,name:name,category:category,consumed:0,min_stock:250};
+  /* existing item: never send 'opening' - the server would reset its stock to
+     the typed value (default 0). Only a genuinely new item gets an opening. */
+  const exists=(RES_EXIST[category]||[]).indexOf(name)!==-1;
+  if(!exists){ body.opening=parseInt(Number(stock),10); }
+  const res=await fetch('/api/resources',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const data=await res.json();
+  if(!res.ok||!data.success){alert(data.error||'Unable to save');return;}
+  closeModal('newMaterialModal');
+  alert(exists ? ('Material "'+name+'" updated successfully.') : ('Material "'+name+'" added successfully.'));
+  location.reload();
+}
+function toggleResNew(sel){
+  const isNew = sel.value==='__new';
+  document.getElementById('resNewWrap').style.display = isNew ? '' : 'none';
+  document.getElementById('resStockWrap').style.display = isNew ? '' : 'none';
+  const info = document.getElementById('resExistInfo');
+  if (!isNew && sel.value){
+    const opt = sel.options[sel.selectedIndex];
+    document.getElementById('resExistStock').textContent =
+      (opt.dataset.closing || '0') + ' ' + (opt.dataset.unit || 'kg');
+    info.style.display = '';
+  } else {
+    info.style.display = 'none';
+  }
+}
+async function saveResource(){
+  let name=document.getElementById('resName').value;
+  if(name==='__new')name=document.getElementById('resNameNew').value.trim();
+  const body={
+    group:"{{ resource_category }}",
+    name:(name||'').trim(),
+    category:document.getElementById('resCategory').value.trim(),
+    min_stock:parseInt(document.getElementById('resMin').value||'250')
+  };
+  if(!body.name){alert('Pick an item from the list or add a new one.');return;}
+  const picked=document.getElementById('resName').value;
+  if(picked==='__new'){
+    /* brand-new item starts at 0 kg (or the typed initial stock) */
+    const st=document.getElementById('resStock').value;
+    body.opening = (st===''||isNaN(Number(st))||Number(st)<0) ? 0 : parseInt(Number(st),10);
+    body.consumed = 0;
+  }
+  /* existing item: no 'opening' key -> server keeps the stored stock untouched */
+  const res=await fetch('/api/resources',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const data=await res.json();
+  if(!res.ok||!data.success){alert(data.error||'Unable to save');return;}
+  alert('Material saved successfully.');
+  location.reload();
+}
+function editStock(btn){
+  const row=btn.closest('tr');
+  const stockCell=row.querySelector('.stock-cell');
+  const txt=stockCell.textContent;
+  const curMatch=txt.match(/[\d,]+/);
+  const curVal=curMatch?parseInt(curMatch[0].replace(/,/g,''),10):0;
+  btn.style.display='none';
+  stockCell.innerHTML='<input type="number" min="0" step="1" value="'+curVal+'" data-init="'+curVal+'" class="form-control" style="width:90px;"> <button class="btn btn-sm btn-success" onclick="saveRowStock(this)">Save</button> <button class="btn btn-sm btn-secondary" onclick="cancelRowStock(this)">Cancel</button>';
+}
+async function saveRowStock(btn){
+  const row=btn.closest('tr');
+  const name=row.dataset.name;
+  const group=row.dataset.group;
+  const unit=row.dataset.unit;
+  /* Look the input UP in the cell - never by sibling position: the Save and
+     Cancel buttons sit between it and the caller, so previousElementSibling
+     points at the wrong element. */
+  const input=row.querySelector('.stock-cell input');
+  if(!input){cancelRowStock(btn);return;}
+  const val=input.value.trim();
+  if(val===''||isNaN(Number(val))||Number(val)<0){alert('Stock must be a whole number.');return;}
+  if(val.length>RES_FIELD_MAX_CHARS){alert('Stock value is excessive - only '+RES_FIELD_MAX_CHARS+' digits are allowed.');return;}
+  const typed=parseInt(Number(val),10);
+  /* Nothing typed? Leave the row alone. Re-saving the prefilled number used to
+     be treated as a fresh stock take, which wiped the stock history and could
+     drop a 50,000 kg row to 0. */
+  if(input.dataset.init!==undefined && typed===parseInt(input.dataset.init,10)){
+    cancelRowStock(btn);
+    alert('No change made - stock stays at '+typed+' '+unit+'.');
+    return;
+  }
+  const res=await fetch('/api/resources/bulk-stock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({group:group,items:[{name:name,stock:typed}]})});
+  const data=await res.json();
+  if(!res.ok||!data.success){alert(data.error||'Unable to save');return;}
+  alert('Stock updated successfully.');
+  location.reload();
+}
+function cancelRowStock(btn){
+  /* Cancel just leaves edit mode and puts the ORIGINAL number back. The old
+     code read btn.previousElementSibling, which for Cancel is the Save button
+     (no data-init), so it fell through to stockCell.textContent - and an input's
+     value is NOT text, so the match found nothing and the cell was rewritten
+     as "0 <unit>", erasing e.g. 9000 on a plain cancel. */
+  const row=btn.closest('tr');
+  const stockCell=row.querySelector('.stock-cell');
+  const unit=row.dataset.unit;
+  const input=stockCell.querySelector('input');
+  let curVal;
+  if(input && input.dataset.init!==undefined && input.dataset.init!==''){
+    curVal=parseInt(input.dataset.init,10);
+  }else{
+    const curMatch=stockCell.textContent.match(/[\d,]+/);
+    curVal=curMatch?parseInt(curMatch[0].replace(/,/g,''),10):0;
+  }
+  if(isNaN(curVal)) curVal=0;
+  stockCell.innerHTML='<strong>'+curVal.toLocaleString('en-IN')+' '+unit+'</strong>';
+  const editBtn=row.querySelector('button[onclick="editStock(this)"]');
+  if(editBtn) editBtn.style.display='';
+}
+function openBulkEdit(){
+  document.getElementById('bulkEditModal').style.display='flex';
+}
+async function saveBulkEdit(){
+  const rows=Array.prototype.slice.call(document.querySelectorAll('#bulkEditModal .bulk-row'));
+  const byGroup={};
+  for(let i=0;i<rows.length;i++){
+    const row=rows[i];
+    const inp=row.querySelector('input');
+    const v=(inp.value||'').trim();
+    if(v===''||!/^\d+$/.test(v)){
+      alert('Stock must be a whole number for '+row.dataset.name+'.');
+      inp.focus();
+      return;
+    }
+    if(v===inp.dataset.init) continue;
+    const g=row.dataset.group;
+    if(!byGroup[g]) byGroup[g]=[];
+    byGroup[g].push({name:row.dataset.name,stock:parseInt(v,10)});
+  }
+  const groups=Object.keys(byGroup);
+  if(!groups.length){ closeModal('bulkEditModal'); return; }
+  const btn=document.getElementById('bulkEditSaveBtn');
+  btn.disabled=true;
+  try{
+    for(let i=0;i<groups.length;i++){
+      const res=await fetch('/api/resources/bulk-stock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({group:groups[i],items:byGroup[groups[i]]})});
+      const data=await res.json();
+      if(!res.ok||!data.success){ alert(data.error||'Unable to save'); return; }
+    }
+    alert('Stocks updated successfully.');
+    location.reload();
+  }catch(e){
+    alert('Unable to save. Check your connection and try again.');
+  }finally{
+    btn.disabled=false;
+  }
+}
+async function deleteMaterial(btn){
+  const row=btn.closest('tr');
+  const id=row.dataset.id;
+  const name=row.dataset.name;
+  if(!confirm('Delete '+name+'?')) return;
+  const res=await fetch('/api/resources/'+id,{method:'DELETE'});
+  const data=await res.json();
+  if(!res.ok||!data.success){alert(data.error||'Unable to delete');return;}
+  row.remove();
+}
+</script>
+{% endblock %}

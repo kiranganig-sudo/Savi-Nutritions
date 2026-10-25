@@ -1,0 +1,390 @@
+{% extends "base.html" %}
+{% block title %}{{ product.name }} - Production Update{% endblock %}
+{% block content %}
+<style>
+.stock-low-row{background:#fff4df!important;}
+.stock-critical-row{background:#fde8e8!important;}
+.selected-tick{color:#166534;font-weight:800;margin-right:4px;}
+</style>
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px;">
+    <div>
+        <div class="breadcrumb">
+            <a href="{{ url_for('dashboard') }}">Home</a>
+            <i class="fas fa-chevron-right"></i>
+            <span>Production Update</span>
+            <i class="fas fa-chevron-right"></i>
+            <span>{{ product.name }}</span>
+        </div>
+        <h1 class="page-title">{{ product.name }}</h1>
+        <div class="page-subtitle">Enter the Old Machine and New Machine batches and the Total Bags for each material. Today's Consumed = Old Machine Consumed + New Machine Consumed; Closing Stock = Opening Stock − Today's Consumed. Opening Stock rolls forward from the previous shift's closing (Resource Maintenance for the first shift).</div>
+    </div>
+    {% if show_update_controls %}
+    <div style="display:flex;align-items:center;gap:12px;margin-top:4px;flex-wrap:wrap;justify-content:flex-end;">
+        <div style="display:flex;align-items:center;gap:6px;padding:4px;border:1px solid #dbe6df;border-radius:10px;background:#f7faf8;">
+            {% if shift_locked %}
+            <span class="btn btn-sm {{ 'btn-primary' if selected_shift == 'morning' else 'btn-outline-dark' }}" style="margin:0;{{ '' if selected_shift == 'morning' else 'opacity:.45;cursor:not-allowed;' }}" aria-disabled="{{ 'false' if selected_shift == 'morning' else 'true' }}"><i class="fas fa-sun"></i> Morning</span>
+            <span class="btn btn-sm {{ 'btn-primary' if selected_shift == 'night' else 'btn-outline-dark' }}" style="margin:0;{{ '' if selected_shift == 'night' else 'opacity:.45;cursor:not-allowed;' }}" aria-disabled="{{ 'false' if selected_shift == 'night' else 'true' }}"><i class="fas fa-moon"></i> Night</span>
+            {% else %}
+            <a href="{{ url_for('inventory_product', product_name=product.name, shift='morning', date=selected_daily) }}" class="btn btn-sm {{ 'btn-primary' if selected_shift == 'morning' else 'btn-outline-dark' }}" style="margin:0;text-decoration:none;"><i class="fas fa-sun"></i> Morning</a>
+            <a href="{{ url_for('inventory_product', product_name=product.name, shift='night', date=selected_daily) }}" class="btn btn-sm {{ 'btn-primary' if selected_shift == 'night' else 'btn-outline-dark' }}" style="margin:0;text-decoration:none;"><i class="fas fa-moon"></i> Night</a>
+            {% endif %}
+        </div>
+        <span style="display:inline-flex;align-items:center;gap:7px;padding:9px 14px;border:1px solid #dbe6df;border-radius:9px;background:#f7faf8;font-size:12.5px;color:#66756c;font-weight:600;"><i class="fas {{ 'fa-lock' if shift_locked else ('fa-sun' if selected_shift == 'morning' else 'fa-moon') }}" style="color:var(--primary);"></i> {% if shift_locked %}Shift locked to {{ 'Morning' if selected_shift == 'morning' else 'Night' }} — chosen at login (log out to change){% else %}Viewing {{ 'Morning' if selected_shift == 'morning' else 'Night' }} shift — either shift can be updated{% endif %}</span>
+        <div style="display:flex;align-items:center;gap:6px;">
+            <label for="productionDate" style="font-size:13px;color:#66756c;font-weight:600;white-space:nowrap;">Production Date</label>
+            <input id="productionDate" name="production_date" form="combinedProductionForm" type="date" value="{{ selected_daily }}" max="{{ today_str }}" onchange="goToDate(this.value)" class="form-control" style="width:160px;">
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+            <label for="supervisorName" style="font-size:13px;color:#66756c;font-weight:600;white-space:nowrap;">Supervisor Name</label>
+            <input id="supervisorName" name="supervisor_name" form="combinedProductionForm" type="text" value="{{ '' if just_saved else supervisor_name }}" placeholder="Enter supervisor name" required class="form-control" data-con="name" style="width:200px;">
+            {% if supervisor_name and not just_saved %}
+            <span style="display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:9px;background:#e8f3ec;color:#1f4d2e;font-size:13px;font-weight:600;white-space:nowrap;"><i class="fas fa-user-check"></i> {{ supervisor_name }}</span>
+            {% endif %}
+        </div>
+        <button type="submit" form="combinedProductionForm" class="btn btn-primary" style="white-space:nowrap;">Save</button>
+    </div>
+    {% endif %}
+</div>
+
+{% if show_update_controls %}
+<form id="combinedProductionForm" method="POST" action="{{ url_for('save_combined_production_update', product_name=product.name) }}" novalidate>
+    <input type="hidden" name="shift" value="{{ selected_shift }}">
+{% endif %}
+{% if request.args.get('error') == '2' %}
+<div style="margin:12px 0;padding:12px 16px;border:1px solid #f0c4c4;border-radius:10px;background:#fdf0f0;color:#9b2226;font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:8px;">
+    <i class="fas fa-exclamation-triangle"></i> Number of batches is not entered properly. It is exceeding the stock{% if request.args.get('over') %} for {{ request.args.get('over') }}{% endif %}. Check and update.
+</div>
+{% elif request.args.get('error') == '4' %}
+<div style="margin:12px 0;padding:12px 16px;border:1px solid #f0c4c4;border-radius:10px;background:#fdf0f0;color:#9b2226;font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:8px;">
+    <i class="fas fa-exclamation-triangle"></i> Production update was not saved &mdash; Production Date cannot be in the future. Pick today or an earlier date.
+</div>
+{% elif request.args.get('error') == '3' %}
+<div style="margin:12px 0;padding:12px 16px;border:1px solid #f0c4c4;border-radius:10px;background:#fdf0f0;color:#9b2226;font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:8px;">
+    <i class="fas fa-exclamation-triangle"></i> Production update was not saved &mdash; Old Machine Batch and New Machine Batch are mandatory. Enter the batch count for every material row.
+</div>
+{% elif request.args.get('error') %}
+<div style="margin:12px 0;padding:12px 16px;border:1px solid #f0c4c4;border-radius:10px;background:#fdf0f0;color:#9b2226;font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:8px;">
+    <i class="fas fa-exclamation-triangle"></i> Production update was not saved &mdash; Supervisor Name, Old Machine Bags and New Machine Bags are mandatory and must be whole numbers.
+</div>
+{% endif %}
+<div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:10px;margin-bottom:12px;">
+    {% if show_update_controls %}
+    <label for="oldBagsBox" style="font-weight:600;color:#33433a;">Old Machine Bags</label>
+    <input id="oldBagsBox" name="old_bags" type="number" min="0" step="1" value="{{ 0 if just_saved else product_old_machine_bags }}" required class="form-input" style="width:110px;">
+    <label for="newBagsBox" style="font-weight:600;color:#33433a;">New Machine Bags</label>
+    <input id="newBagsBox" name="new_bags" type="number" min="0" step="1" value="{{ 0 if just_saved else product_new_machine_bags }}" required class="form-input" style="width:110px;">
+    <label for="totalBagsCalc" style="font-weight:600;color:#33433a;">Total</label>
+    <input id="totalBagsCalc" type="number" min="0" step="1" value="0" readonly class="form-input" style="width:110px;background:#eef4f0;font-weight:700;color:var(--primary);">
+    {% endif %}
+</div>
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h3 style="margin:0 0 4px;">{{ product.name }} - Production Update</h3>
+            <div style="color:#66756c;font-size:13px;">Selected materials for this production update</div>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="combinedTable">
+            <thead>
+                <tr>
+                    <th style="width:50px;">Sl No</th>
+                    <th>Material</th>
+                    <th>Opening Stock</th>
+                    <th>Old Machine Qty</th>
+                    <th>Old Machine Batch</th>
+                    <th>Old Machine Consumed</th>
+                    <th>New Machine Qty</th>
+                    <th>New Machine Batch</th>
+                    <th>New Machine Consumed</th>
+                    <th>Today's Consumed</th>
+                    <th>Closing Stock</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in material_stock %}
+                {% set _old_batch = row.old_batches|default(0)|float %}
+                {% set _new_batch = row.new_batches|default(0)|float %}
+                {% set _old_consumed = (row.old_machine_qty|default(0)|float) * _old_batch %}
+                {% set _new_consumed = (row.new_machine_qty|default(0)|float) * _new_batch %}
+                {# Change #47 item 4 (2026-10-07): Today's Consumed is ALWAYS
+                   Old Machine Consumed + New Machine Consumed. The old code
+                   preferred row.total_consumed (the stored material_daily
+                   value, e.g. an admin bulk entry) which could disagree with
+                   the two batch columns the user actually typed - the JS
+                   recalc rewrote the cell to old+new a beat later anyway. #}
+                {% set _today_consumed = _old_consumed + _new_consumed %}
+                {% set _closing = [(row.opening|default(0)|float - _today_consumed), 0]|max %}
+                <tr data-material-row="{{ row.material }}" class="{% if row.resource_status == 'Critical' %}stock-critical-row{% elif row.resource_status == 'Low Stock' %}stock-low-row{% endif %}">
+                    <td><input type="hidden" name="selected_materials[]" value="{{ row.material }}"><span class="selected-tick">✓</span>{{ loop.index }}</td>
+                    <td><strong>{{ row.material }}</strong>{% if row.resource_status in ('Low Stock', 'Critical') %}<span class="badge {% if row.resource_status == 'Critical' %}badge-danger{% else %}badge-warning{% endif %}" style="margin-left:6px;">{{ row.resource_status }}</span>{% endif %}</td>
+                    <td class="cell-opening">{{ '%g'|format(row.opening|default(0)|float) }} kg</td>
+                    <td class="cell-oldqty">{{ '%g'|format(row.old_machine_qty|default(0)|float) }}</td>
+                    <td class="cell-oldbatch">{% if active_is_third_party %}<input type="number" min="0" step="1" name="old_batches[]" class="form-input oldb-input" value="{{ 0 if just_saved else '%g'|format(row.old_batches|default(0)|float) }}" required style="width:70px;">{% elif can_edit %}<input type="number" min="0" step="1" name="old_batches[]" class="form-input oldb-input" value="{{ 0 if just_saved else row.old_batches|default(0) }}" required style="width:70px;">{% else %}{{ row.old_batches|default(0) }}{% endif %}</td>
+                    <td class="cell-oldconsumed">{{ '%g'|format(_old_consumed) }} kg</td>
+                    <td class="cell-newqty">{{ '%g'|format(row.new_machine_qty|default(0)|float) }}</td>
+                    <td class="cell-newbatch">{% if active_is_third_party %}<input type="number" min="0" step="1" name="new_batches[]" class="form-input newb-input" value="{{ 0 if just_saved else '%g'|format(row.new_batches|default(0)) }}" required style="width:70px;">{% elif can_edit %}<input type="number" min="0" step="1" name="new_batches[]" class="form-input newb-input" value="{{ 0 if just_saved else row.new_batches|default(0) }}" required style="width:70px;">{% else %}{{ row.new_batches|default(0) }}{% endif %}</td>
+                    <td class="cell-newconsumed">{{ '%g'|format(_new_consumed) }} kg</td>
+                    <td class="cell-todays">{{ '%g'|format(_today_consumed) }} kg</td>
+                    <td class="cell-closing">{{ '%g'|format(_closing) }} kg</td>
+                </tr>
+            {% else %}
+                <tr data-empty-row="true">
+                    <td colspan="11">
+                        <div class="empty-state">
+                            <i class="fas fa-boxes-stacked"></i>
+                            <h3>No materials found</h3>
+                            <p>No materials are currently listed for this product in Production Formula.</p>
+                        </div>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+            {% if material_stock %}
+            <tfoot>
+                <tr style="background:#f7f9f7;font-weight:600;">
+                    <td colspan="5" style="text-align:right;">Total</td>
+                    <td id="totalOldConsumed">0 kg</td>
+                    <td colspan="2"></td>
+                    <td id="totalNewConsumed">0 kg</td>
+                    <td id="totalTodayConsumed">0 kg</td>
+                    <td id="totalClosing">0 kg</td>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+    </div>
+</div>
+{% if show_update_controls %}
+</form>
+{% endif %}
+
+<div class="modal-overlay" id="savedDialog" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.5);align-items:center;justify-content:center;z-index:3000;padding:20px;">
+    <div class="modal" style="background:#fff;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.25);padding:28px;max-width:420px;text-align:center;">
+        <h3 style="margin:0 0 10px;color:#1f4d2e;"><i class="fas fa-check-circle" style="color:#2e8b57;margin-right:8px;"></i>Saved Successfully</h3>
+        <p style="margin:0 0 20px;color:#5a6b60;font-size:14px;">Production update saved successfully.</p>
+        <button class="btn btn-primary" onclick="closeSavedDialog();" style="width:100%;">OK</button>
+    </div>
+</div>
+
+<script>
+(function(){
+    var canEdit = {{ 'true' if can_edit else 'false' }};
+    var isThirdParty = {{ 'true' if active_is_third_party else 'false' }};
+    var showControls = {{ 'true' if show_update_controls else 'false' }};
+    function toInt(v){ var n = parseInt(v, 10); return (isNaN(n) || n < 0) ? 0 : n; }
+    function toNum(v){ var n = parseFloat(v); return (isNaN(n) || n < 0) ? 0 : n; }
+    function fmt(v){ var s = (Math.round(v * 100) / 100).toString(); return s.indexOf('.') < 0 ? s : s.replace(/0+$/, '').replace(/\.$/, ''); }
+    window.closeSavedDialog = function(){
+        var d = document.getElementById('savedDialog');
+        d.style.display = 'none';
+        document.body.classList.remove('modal-open');
+        // Item 4: ?saved=1 is deliberately KEPT in the URL - it is what tells the
+        // server to re-render the entry boxes empty on a refresh. Picking another
+        // date (goToDate) or leaving the page drops it, which is how the saved
+        // values come back when the user returns to that date.
+    };
+    // Item 3: the picker's max stops future dates; this reloads the page for the
+    // chosen date (dropping ?saved=1) so the stored values reappear.
+    function goToDate(v){
+        if(!v) return;
+        var u = new URL(window.location.href);
+        u.searchParams.set('date', v);
+        u.searchParams.delete('saved');
+        u.searchParams.delete('error');
+        u.searchParams.delete('over');
+        window.location.href = u.toString();
+    }
+    function bagsTotal(){
+        var oB = document.getElementById('oldBagsBox');
+        var nB = document.getElementById('newBagsBox');
+        var tB = document.getElementById('totalBagsCalc');
+        if(oB && nB && tB){ tB.value = toInt(oB.value) + toInt(nB.value); }
+    }
+    function cleanWholeNumberBox(el){
+        var v = String(el.value == null ? '' : el.value);
+        if(v.indexOf('.') !== -1){
+            var n = Math.round(parseFloat(v));
+            el.value = (isNaN(n) || n < 0) ? '' : String(n);
+        }
+    }
+    function bindWholeNumberBox(el, after){
+        if(!el || el.getAttribute('data-whole-number') === '1') return;
+        el.setAttribute('data-whole-number', '1');
+        el.addEventListener('keydown', function(ev){
+            if(ev.key === 'e' || ev.key === 'E' || ev.key === '+' || ev.key === '-' || ev.key === '.' || ev.key === ','){ ev.preventDefault(); }
+        });
+        el.addEventListener('input', function(){ cleanWholeNumberBox(el); if(after) after(); });
+        el.addEventListener('change', function(){ cleanWholeNumberBox(el); if(after) after(); });
+        cleanWholeNumberBox(el);
+    }
+    ['oldBagsBox', 'newBagsBox'].forEach(function(id){
+        var el = document.getElementById(id);
+        if(el) bindWholeNumberBox(el, bagsTotal);
+    });
+    if(isThirdParty){
+        // 3rd-party (final): ONLY the two Batch columns are editable - Old Machine
+        // Batch + New Machine Batch (whole-number inputs, seeded from the stored
+        // pair else the formula counts). Both Qty columns are text: old qty = 0 so
+        // old consumed = 0; new qty = the stored row value -> new consumed =
+        // stored new qty x typed new batch.
+        var rows3 = [];
+        {% for row in material_stock %}
+        rows3.push({o: {{ row.opening|default(0)|float }}, oq: {{ row.old_machine_qty|default(0)|float }}, nq: {{ row.new_machine_qty|default(0)|float }}});
+        {% endfor %}
+        var obInputs = function(){ return Array.prototype.slice.call(document.querySelectorAll('.oldb-input')); };
+        var nbInputs = function(){ return Array.prototype.slice.call(document.querySelectorAll('.newb-input')); };
+        function recalc3(){
+            var obIn = obInputs();
+            var nbIn = nbInputs();
+            var tableRows = document.querySelectorAll('#combinedTable tbody tr[data-material-row]');
+            var tOld = 0, tNew = 0, tToday = 0, tClosing = 0;
+            rows3.forEach(function(r, i){
+                if(!tableRows[i] || !obIn[i] || !nbIn[i]) return;
+                var oc = r.oq * toInt(obIn[i].value);
+                var nc = r.nq * toInt(nbIn[i].value);
+                var tc = oc + nc;
+                var closing = Math.max(r.o - tc, 0);
+                tOld += oc; tNew += nc; tToday += tc; tClosing += closing;
+                var cells = tableRows[i].cells;
+                cells[5].textContent = fmt(oc) + ' kg';
+                cells[8].textContent = fmt(nc) + ' kg';
+                cells[9].textContent = fmt(tc) + ' kg';
+                cells[10].textContent = fmt(closing) + ' kg';
+            });
+            document.getElementById('totalOldConsumed').textContent = fmt(tOld) + ' kg';
+            document.getElementById('totalNewConsumed').textContent = fmt(tNew) + ' kg';
+            document.getElementById('totalTodayConsumed').textContent = fmt(tToday) + ' kg';
+            document.getElementById('totalClosing').textContent = fmt(tClosing) + ' kg';
+            bagsTotal();
+        }
+        obInputs().forEach(function(inp){ bindWholeNumberBox(inp, recalc3); });
+        nbInputs().forEach(function(inp){ bindWholeNumberBox(inp, recalc3); });
+        recalc3();
+    } else if(canEdit){
+        var rows = [];
+        {% for row in material_stock %}
+        rows.push({material: {{ row.material|tojson }}, o: {{ row.opening|default(0)|float }}, oq: {{ row.old_machine_qty|default(0)|float }}, nq: {{ row.new_machine_qty|default(0)|float }}, status: {{ (row.resource_status or '')|tojson }}});
+        {% endfor %}
+        var oldbInputs = function(){ return Array.prototype.slice.call(document.querySelectorAll('.oldb-input')); };
+        var newbInputs = function(){ return Array.prototype.slice.call(document.querySelectorAll('.newb-input')); };
+        function recalc(){
+            var obIn = oldbInputs();
+            var nbIn = newbInputs();
+            var tOld = 0, tNew = 0, tToday = 0, tClosing = 0;
+            rows.forEach(function(r, i){
+                var tableRows = document.querySelectorAll('#combinedTable tbody tr[data-material-row]');
+                var cells = tableRows[i].cells;
+                var oldB = toInt(obIn[i].value);
+                var newB = toInt(nbIn[i].value);
+                var oc = r.oq * oldB;
+                var nc = r.nq * newB;
+                var tc = oc + nc;
+                var closing = Math.max(r.o - tc, 0);
+                tOld += oc; tNew += nc; tToday += tc; tClosing += closing;
+                cells[5].textContent = fmt(oc) + ' kg';
+                cells[8].textContent = fmt(nc) + ' kg';
+                cells[9].textContent = fmt(tc) + ' kg';
+                cells[10].textContent = fmt(closing) + ' kg';
+            });
+            document.getElementById('totalOldConsumed').textContent = fmt(tOld) + ' kg';
+            document.getElementById('totalNewConsumed').textContent = fmt(tNew) + ' kg';
+            document.getElementById('totalTodayConsumed').textContent = fmt(tToday) + ' kg';
+            document.getElementById('totalClosing').textContent = fmt(tClosing) + ' kg';
+            bagsTotal();
+        }
+        oldbInputs().forEach(function(inp){ bindWholeNumberBox(inp, recalc); });
+        newbInputs().forEach(function(inp){ bindWholeNumberBox(inp, recalc); });
+        function firstRowMaster(selector){
+            var els = document.querySelectorAll(selector);
+            if(!els.length) return;
+            var first = els[0];
+            first.addEventListener('input', function(){
+                var v = first.value;
+                for(var i = 1; i < els.length; i++){ els[i].value = v; }
+                recalc();
+            });
+        }
+        firstRowMaster('.oldb-input');
+        firstRowMaster('.newb-input');
+        recalc();
+    }
+    if(showControls){
+        bagsTotal();
+        var prodForm = document.getElementById('combinedProductionForm');
+        if(prodForm){
+            /* Change #41: Supervisor Name, Old Machine Bags, New Machine Bags and
+               every Old/New Machine Batch are MANDATORY whole numbers. novalidate
+               on the form turns off the browser's per-field bubble so all missing
+               fields are reported at once, red-highlighted (same rules the server
+               enforces with ?error=1 / ?error=3). */
+            function setBad(el, bad){
+                if(!el) return;
+                el.style.border = bad ? '2px solid #dc2626' : '';
+                el.style.background = bad ? '#fff5f5' : '';
+            }
+            function isWhole(v){ return /^\d+$/.test(String(v == null ? '' : v).trim()); }
+            prodForm.addEventListener('submit', function(e){
+                var problems = [];
+                var sup = document.getElementById('supervisorName');
+                if(!sup || !sup.value.trim()){ setBad(sup, true); problems.push('Supervisor Name'); }
+                else setBad(sup, false);
+                var obBox = document.getElementById('oldBagsBox');
+                if(!obBox || !isWhole(obBox.value)){ setBad(obBox, true); problems.push('Old Machine Bags'); }
+                else setBad(obBox, false);
+                var nbBox = document.getElementById('newBagsBox');
+                if(!nbBox || !isWhole(nbBox.value)){ setBad(nbBox, true); problems.push('New Machine Bags'); }
+                else setBad(nbBox, false);
+                var obIn = document.querySelectorAll('.oldb-input');
+                for(var b = 0; b < obIn.length; b++){
+                    if(!isWhole(obIn[b].value)){ setBad(obIn[b], true); problems.push('Row ' + (b + 1) + ': Old Machine Batch'); }
+                    else setBad(obIn[b], false);
+                }
+                var nbIn = document.querySelectorAll('.newb-input');
+                for(var b2 = 0; b2 < nbIn.length; b2++){
+                    if(!isWhole(nbIn[b2].value)){ setBad(nbIn[b2], true); problems.push('Row ' + (b2 + 1) + ': New Machine Batch'); }
+                    else setBad(nbIn[b2], false);
+                }
+                if(problems.length){
+                    e.preventDefault();
+                    alert('These fields are required and must be whole numbers:\n\n- '
+                          + problems.join('\n- ') + '\n\nNothing was saved - fill them in and save again.');
+                    return;
+                }
+                var trs = document.querySelectorAll('#combinedTable tbody tr[data-material-row]');
+                var obIn = Array.prototype.slice.call(document.querySelectorAll('.oldb-input'));
+                var nbIn = Array.prototype.slice.call(document.querySelectorAll('.newb-input'));
+                for(var i = 0; i < trs.length; i++){
+                    var c = trs[i].cells;
+                    if(!c || c.length < 7) continue;
+                    var opening = parseFloat(c[2].textContent) || 0;
+                    var oq = parseFloat(c[3].textContent) || 0;
+                    var nq = parseFloat(c[6].textContent) || 0;
+                    var ob = obIn[i] ? toInt(obIn[i].value) : 0;
+                    var nb = nbIn[i] ? toInt(nbIn[i].value) : 0;
+                    // Change #47 item 6: TODAY'S CONSUMED (old machine consumed
+                    // + new machine consumed) is compared against this row's
+                    // Opening Stock BEFORE the form is allowed to submit.
+                    if(oq * ob + nq * nb > opening + 0.001){
+                        e.preventDefault();
+                        alert('Number of batches is not entered properly. It is exceeding the stock. Check and update.');
+                        return;
+                    }
+                }
+            });
+        }
+    }
+    {% if request.args.get('saved') %}
+    // Show the confirmation once per arrival here; ?saved=1 stays in the URL so a
+    // refresh keeps the cleared form instead of popping the dialog again.
+    if(!sessionStorage.getItem('saviSavedShown')){
+        try{ sessionStorage.setItem('saviSavedShown', '1'); }catch(e){}
+        document.getElementById('savedDialog').style.display = 'flex';
+        document.body.classList.add('modal-open');
+    }
+    {% else %}
+    try{ sessionStorage.removeItem('saviSavedShown'); }catch(e){}
+    {% endif %}
+})();
+</script>
+{% endblock %}

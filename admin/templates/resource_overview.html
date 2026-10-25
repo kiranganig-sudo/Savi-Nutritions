@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Resource Maintenance - Overview{% endblock %}
+{% block content %}
+<style>
+  .res-container{margin-bottom:22px;}
+  .res-counts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .slide-wrap{position:relative;}
+  .slide-btn{position:absolute;top:38%;z-index:3;width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:#fff;color:var(--text-medium);cursor:pointer;box-shadow:var(--shadow-md);display:flex;align-items:center;justify-content:center;}
+  .slide-btn:hover{background:#e8f5e9;color:#1B5E20;}
+  .slide-btn.prev{left:6px;}
+  .slide-btn.next{right:6px;}
+  .slide-chart{display:flex;gap:12px;overflow-x:auto;padding:16px 46px 8px;scroll-behavior:smooth;}
+  .slide-chart::-webkit-scrollbar{height:8px;}
+  .slide-chart::-webkit-scrollbar-track{background:#eef1f4;border-radius:6px;}
+  .slide-chart::-webkit-scrollbar-thumb{background:#3B8A43;border-radius:6px;}
+  .slide-col{flex:0 0 74px;display:flex;flex-direction:column;align-items:center;gap:6px;}
+  .slide-val{font-size:11.5px;font-weight:800;color:#111;}
+  .slide-plot{height:150px;width:100%;display:flex;align-items:flex-end;justify-content:center;}
+  .slide-bar{width:40px;border-radius:8px 8px 4px 4px;min-height:6px;}
+  .slide-bar.ok{background:linear-gradient(180deg,#43a047,#3B8A43);}
+  .slide-bar.low{background:linear-gradient(180deg,#f6b73c,#f59e0b);}
+  .slide-bar.crit{background:linear-gradient(180deg,#f87171,#dc2626);animation:critblink 1s ease-in-out infinite;}
+  @keyframes critblink{0%,100%{opacity:1;}50%{opacity:.4;}}
+  .slide-name{font-size:10px;color:var(--text-medium);text-align:center;line-height:1.3;min-height:26px;word-break:break-word;}
+</style>
+
+<div class="page-header">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Resource Maintenance</span></div>
+    <h1 class="page-title">Resource Overview</h1>
+    <div class="page-subtitle">All three registers in one place — slide sideways inside each container to see every item, lowest stock first.</div>
+  </div>
+</div>
+
+{% for g in groups %}
+<div class="card res-container">
+  <div class="card-header">
+    <div class="card-title"><i class="fas fa-boxes-stacked" style="color:var(--primary);margin-right:8px;"></i> {{ g.group }}</div>
+    <div class="res-counts">
+      <span class="badge badge-primary">{{ g.total }} items</span>
+      <span class="badge badge-success">{{ g.good }} good</span>
+      {% if g.low %}<span class="badge badge-warning">{{ g.low }} Low Stock</span>{% endif %}
+      {% if g.critical %}<span class="badge badge-danger">{{ g.critical }} critical</span>{% endif %}
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('resource_maintenance', category=g.group) }}">Open details <i class="fas fa-arrow-right"></i></a>
+    </div>
+  </div>
+  <div class="card-body" style="padding-top:6px;">
+    <div class="slide-wrap">
+      <button class="slide-btn prev" type="button" onclick="slideGraph(this,-1)" aria-label="Slide left"><i class="fas fa-chevron-left"></i></button>
+      <div class="slide-chart">
+        {% for item in g.rows %}
+        {% set pct = ((item.closing / g.max_closing * 100))|round(1) %}
+        <div class="slide-col" title="{{ item.name }}: {{ item.closing }} {{ item.unit }} ({{ item.status }})">
+          <div class="slide-val">{{ item.closing }}</div>
+          <div class="slide-plot"><div class="slide-bar {% if item.status == 'Critical' %}crit{% elif item.status == 'Low Stock' %}low{% else %}ok{% endif %}" style="height:{{ pct }}%;"></div></div>
+          <div class="slide-name">{{ item.name }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      <button class="slide-btn next" type="button" onclick="slideGraph(this,1)" aria-label="Slide right"><i class="fas fa-chevron-right"></i></button>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+<script>
+function slideGraph(btn, dir){
+  const chart = btn.parentElement.querySelector('.slide-chart');
+  chart.scrollBy({left: dir * 320, behavior: 'smooth'});
+}
+</script>
+{% endblock %}

@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SAVI Nutrition{% endblock %} - Inventory Management</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo.png') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+      /* Global loader: one big 3D leaf, gentle sway (transform-only, smooth) */
+      #pageLoader{position:fixed;inset:0;background:rgba(247,250,248,.96);z-index:5000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;transition:opacity .35s;}
+      #pageLoader.hide{opacity:0;pointer-events:none;}
+      #pageLoader .leaf-stage{perspective:650px;width:170px;}
+      #pageLoader .big-leaf{width:128px;height:140px;margin:0 auto;transform-style:preserve-3d;will-change:transform;animation:leafsway 2.8s ease-in-out infinite;filter:drop-shadow(0 16px 14px rgba(18,60,34,.30));}
+      #pageLoader .big-leaf svg{width:100%;height:100%;display:block;overflow:visible;}
+      @keyframes leafsway{0%,100%{transform:rotateY(-24deg) rotateZ(-4deg) translateY(0);}50%{transform:rotateY(24deg) rotateZ(4deg) translateY(-9px);}}
+      #pageLoader .leaf-ground{width:118px;height:16px;margin:10px auto 0;border-radius:50%;background:radial-gradient(ellipse at center,rgba(18,60,34,.32),transparent 70%);animation:groundsway 2.8s ease-in-out infinite;}
+      @keyframes groundsway{0%,100%{transform:scaleX(1);opacity:.9;}50%{transform:scaleX(.8);opacity:.55;}}
+      #pageLoader .page-loader-text{font-size:13px;font-weight:600;color:#1c5c37;}
+      #pageLoader .page-loader-sub{font-size:11.5px;color:#818883;}
+      /* Profile dropdown */
+      .user-profile{position:relative;}
+      .profile-dropdown{position:absolute;top:calc(100% + 10px);right:0;min-width:310px;max-height:80vh;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 18px 45px rgba(15,40,25,.22);display:none;z-index:1500;}
+      .profile-dropdown.open{display:block;}
+      .pd-head{display:flex;align-items:center;gap:12px;padding:15px;background:#f7faf8;border-bottom:1px solid var(--border);}
+      .pd-avatar{width:42px;height:42px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+      .pd-headtext{min-width:0;}
+      .pd-name{font-size:14px;font-weight:700;color:var(--text-dark);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      .pd-sub{font-size:11.5px;color:var(--text-light);}
+      .pd-body{padding:12px 15px;}
+      .pd-row{display:flex;justify-content:space-between;gap:14px;font-size:12.5px;padding:6px 0;border-bottom:1px dashed var(--border);}
+      .pd-row:last-child{border-bottom:0;}
+      .pd-row span{color:var(--text-light);}
+      .pd-row b{font-weight:600;color:var(--text-dark);word-break:break-all;text-align:right;}
+      .pd-divider{height:1px;background:var(--border);margin:0 12px;}
+      .pd-item{display:flex;align-items:center;gap:10px;width:100%;padding:13px 15px;border:0;background:#fff;font:inherit;font-size:13.5px;font-weight:600;color:var(--text-dark);cursor:pointer;text-align:left;text-decoration:none;}
+      .pd-item:hover{background:var(--primary-bg);color:var(--primary);}
+      .pd-item i{width:18px;color:var(--primary);}
+      .pd-users{padding:10px 15px 4px;}
+      .pd-users-head{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-light);margin-bottom:8px;}
+      .pd-users-list{max-height:230px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;}
+      .pd-user-card{background:#f7faf8;border:1px solid var(--border);border-radius:9px;padding:9px 11px;}
+      .pd-user-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px;}
+      .pd-user-top b{font-size:13px;color:var(--text-dark);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      .pd-tag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:#e7f5ea;color:#1c5c37;flex-shrink:0;}
+      .pd-user-row{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;color:var(--text-medium);padding:1.5px 0;}
+      .pd-user-row span{color:var(--text-light);}
+      .pd-empty{font-size:12px;color:var(--text-light);padding:6px 0;}
+      .pd-current{padding:10px 15px 4px;}
+      .pd-user-card.current{border-color:#bfe0c7;background:#f0faf2;}
+      .pd-tag.online{background:#dcfce7;color:#15803d;}
+      .pd-live-dot{color:#22c55e;font-size:8px;margin-right:5px;vertical-align:middle;}
+    </style>
+</head>
+<body>
+    <svg width="0" height="0" style="position:absolute;" aria-hidden="true">
+      <defs>
+        <linearGradient id="rlBig" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#8fd694"/>
+          <stop offset=".4" stop-color="#34a853"/>
+          <stop offset=".75" stop-color="#166534"/>
+          <stop offset="1" stop-color="#0b3d22"/>
+        </linearGradient>
+        <linearGradient id="rlShade" x1="0" y1="0" x2="1" y2="0">
+          <stop offset=".55" stop-color="#062b18" stop-opacity="0"/>
+          <stop offset="1" stop-color="#062b18" stop-opacity=".55"/>
+        </linearGradient>
+        <g id="rlBigLeaf">
+          <path d="M65 11 C101 30 111 72 65 120 C64 121 62 121 61 120 C15 72 25 30 59 11 C60 10 63 10 65 11 Z" fill="#072a18" opacity=".6" transform="translate(5,6)"/>
+          <path d="M60 5 C96 24 106 66 60 114 C14 66 24 24 60 5 Z" fill="url(#rlBig)"/>
+          <path d="M60 5 C96 24 106 66 60 114 C14 66 24 24 60 5 Z" fill="url(#rlShade)"/>
+          <path d="M60 13 L60 105" stroke="#e2f4e5" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+          <path d="M60 13 L60 105" stroke="#0b3d22" stroke-width="1.2" stroke-linecap="round" fill="none" opacity=".5"/>
+          <path d="M60 32 L79 43 M60 32 L41 43 M60 50 L84 63 M60 50 L36 63 M60 68 L80 79 M60 68 L40 79 M60 85 L73 93 M60 85 L47 93" stroke="#c9ecd0" stroke-width="2.4" stroke-linecap="round" fill="none"/>
+          <ellipse cx="45" cy="42" rx="7" ry="17" fill="#ffffff" opacity=".34" transform="rotate(-16 45 42)"/>
+          <ellipse cx="78" cy="76" rx="4.5" ry="11" fill="#ffffff" opacity=".14" transform="rotate(14 78 76)"/>
+          <path d="M60 114 L60 128" stroke="#3f6212" stroke-width="5" stroke-linecap="round"/>
+        </g>
+      </defs>
+    </svg>
+    <div id="pageLoader">
+      <div class="leaf-stage">
+        <div class="big-leaf"><svg viewBox="0 0 120 132"><use href="#rlBigLeaf"/></svg></div>
+        <div class="leaf-ground"></div>
+      </div>
+      <div class="page-loader-text">Loading…</div>
+      <div class="page-loader-sub">Savi Nutrition</div>
+    </div>
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <a style="display:block;background:none;border:none;padding:0;margin:0;cursor:default;text-decoration:none;">
+                    <img src="{{ url_for('static', filename='img/logo.png') }}"
+                         alt="SaviNutritions Pvt Ltd - The Goodness of Nature" class="logo-img">
+                </a>
+            </div>
+            <button class="sidebar-close" id="sidebarClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="{{ url_for('dashboard') }}" class="nav-item {% if active_page == 'dashboard' %}active{% endif %}">
+                <i class="fas fa-home"></i>
+                <span>Dashboard</span>
+            </a>
+            <div class="nav-item has-submenu {% if active_page == 'formulas' %}active{% endif %}">
+                <div class="nav-item-main" onclick="toggleSubmenu(this)">
+                    <div class="nav-left">
+                        <i class="fas fa-flask"></i>
+                        <span>Production Formula</span>
+                    </div>
+                    <i class="fas fa-chevron-down submenu-arrow"></i>
+                </div>
+                <div class="submenu {% if active_page == 'formulas' %}open{% endif %}">
+                    {% for _np in nav_products %}
+                    <div class="formula-submenu-row">
+                        <a href="{{ url_for('formulas', list=_np) }}" class="submenu-item {% if request.args.get('list', nav_products|first) == _np %}active{% endif %}">{{ _np }}</a>
+                        <button type="button" class="submenu-trash" title="Delete {{ _np }}" onclick="deleteProduct('{{ _np }}', {{ nav_product_ids.get(_np) }})"><i class="fas fa-trash"></i></button>
+                    </div>
+                    {% endfor %}
+                    <div class="submenu-item" style="padding-bottom:6px;">
+                        <button type="button" onclick="toggleThirdPartyMenu(this)" style="width:100%;display:flex;align-items:center;justify-content:space-between;border:0;background:transparent;cursor:pointer;font:inherit;color:inherit;padding:0;">
+                            <span><i class="fas fa-boxes-stacked" style="width:18px;"></i> 3rd Party Product</span><i class="fas fa-chevron-down" id="thirdPartyArrow"></i>
+                        </button>
+                        <div id="thirdPartyMenu" style="display:{% if request.args.get('list') in nav_third_party %}block{% else %}none{% endif %};padding:5px 0 0 24px;">
+                            {% for _tp in nav_third_party %}
+                            <div class="formula-submenu-row">
+                                <a href="{{ url_for('formulas', list=_tp) }}" class="submenu-item {% if request.args.get('list') == _tp %}active{% endif %}" style="font-size:12.5px;padding:8px 10px;">{{ _tp }}</a>
+                                <button type="button" class="submenu-trash" title="Delete {{ _tp }}" onclick="deleteThirdPartyProduct('{{ _tp }}', {{ nav_third_party_ids.get(_tp) }})"><i class="fas fa-trash"></i></button>
+                            </div>
+                            {% else %}
+                            <div style="padding:7px 10px;color:var(--text-light);font-size:12px;">No 3rd party products yet</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <button type="button" class="submenu-item" style="width:100%;text-align:left;border:0;background:transparent;cursor:pointer;font:inherit;" onclick="addNewThirdPartyProduct()"><i class="fas fa-plus" style="width:18px;"></i> Add 3rd Party Product</button>
+                    <button type="button" class="submenu-item" style="width:100%;text-align:left;border:0;background:transparent;cursor:pointer;font:inherit;" onclick="addNewFormulaProduct()"><i class="fas fa-plus" style="width:18px;"></i> Add New Product</button>
+                </div>
+            </div>
+            <div class="nav-item has-submenu {% if active_page == 'inventory_product' %}active{% endif %}">
+                <div class="nav-item-main" onclick="toggleSubmenu(this)">
+                    <div class="nav-left">
+                        <i class="fas fa-boxes-stacked"></i>
+                        <span>Production Update</span>
+                    </div>
+                    <i class="fas fa-chevron-down submenu-arrow"></i>
+                </div>
+                <div class="submenu {% if active_page == 'inventory_product' %}open{% endif %}">
+                    {% for _np in nav_production_products %}
+                    <a href="{{ url_for('inventory_product', product_name=_np) }}" class="submenu-item {% if active_product == _np %}active{% endif %}">{{ _np }}</a>
+                    {% endfor %}
+                    <div class="submenu-item" style="padding-bottom:6px;">
+                        <button type="button" onclick="toggleProductionThirdPartyMenu(this)" style="width:100%;display:flex;align-items:center;justify-content:space-between;border:0;background:transparent;cursor:pointer;font:inherit;color:inherit;padding:0;">
+                            <span><i class="fas fa-boxes-stacked" style="width:18px;"></i> 3rd Party Product</span><i class="fas fa-chevron-down" id="productionThirdPartyArrow"></i>
+                        </button>
+                        <div id="productionThirdPartyMenu" style="display:{% if request.args.get('product') in nav_third_party or active_product in nav_third_party %}block{% else %}none{% endif %};padding:5px 0 0 24px;">
+                            {% for _tp in nav_third_party %}
+                            <a href="{{ url_for('inventory_product', product_name=_tp) }}" class="submenu-item {% if active_product == _tp %}active{% endif %}" style="font-size:12.5px;padding:8px 10px;">{{ _tp }}</a>
+                            {% else %}
+                            <div style="padding:7px 10px;color:var(--text-light);font-size:12px;">No 3rd party products yet</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <a href="{{ url_for('production_stock') }}" class="nav-item {% if active_page == 'production_stock' %}active{% endif %}">
+                <i class="fas fa-industry"></i>
+                <span>Product Details</span>
+            </a>
+            <div class="nav-item has-submenu {% if active_page == 'resource_maintenance' %}active{% endif %}">
+                <div class="nav-item-main" onclick="toggleSubmenu(this)">
+                    <div class="nav-left">
+                        <i class="fas fa-wrench"></i>
+                        <span>Resource Management</span>
+                    </div>
+                    <i class="fas fa-chevron-down submenu-arrow"></i>
+                </div>
+                <div class="submenu {% if active_page == 'resource_maintenance' %}open{% endif %}">
+                    <a href="{{ url_for('resource_maintenance', category='Raw Materials') }}" class="submenu-item {% if resource_category == 'Raw Materials' %}active{% endif %}">Raw Materials</a>
+                    <a href="{{ url_for('resource_maintenance', category='Medicines') }}" class="submenu-item {% if resource_category == 'Medicines' %}active{% endif %}">Medicines</a>
+                    <a href="{{ url_for('resource_maintenance', category='Chemicals') }}" class="submenu-item {% if resource_category == 'Chemicals' %}active{% endif %}">Chemicals</a>
+                </div>
+            </div>
+            <a href="{{ url_for('purchase_records') }}" class="nav-item {% if active_page == 'purchase_maintenance' %}active{% endif %}">
+                <i class="fas fa-file-invoice"></i>
+                <span>Purchase Maintenance</span>
+            </a>
+            <a href="{{ url_for('vendors') }}" class="nav-item {% if active_page == 'vendors' %}active{% endif %}">
+                <i class="fas fa-users"></i>
+                <span>Vendors Management</span>
+            </a>
+            <a href="{{ url_for('admin_driver_details') }}" class="nav-item {% if active_page == 'admin_driver_details' %}active{% endif %}">
+                <i class="fas fa-truck"></i>
+                <span>Driver Details</span>
+            </a>
+            <a href="{{ url_for('raw_materials_sales') }}" class="nav-item {% if active_page == 'raw_materials_sales' %}active{% endif %}">
+                <i class="fas fa-sack-dollar"></i>
+                <span>Raw Materials Sales</span>
+            </a>
+            <a href="{{ url_for('product_sales') }}" class="nav-item {% if active_page == 'product_sales' %}active{% endif %}">
+                <i class="fas fa-cart-shopping"></i>
+                <span>Product Sales</span>
+            </a>
+            <a href="{{ url_for('remarks') }}" class="nav-item {% if active_page == 'remarks' %}active{% endif %}">
+                <i class="fas fa-comment-dots"></i>
+                <span>Remarks</span>
+            </a>
+            <a href="{{ url_for('reports') }}" class="nav-item {% if active_page == 'reports' %}active{% endif %}">
+                <i class="fas fa-chart-bar"></i>
+                <span>Reports</span>
+            </a>
+            <a href="{{ url_for('users') }}" class="nav-item {% if active_page == 'users' %}active{% endif %}">
+                <i class="fas fa-users-gear"></i>
+                <span>User Access</span>
+            </a>
+            <a href="{{ url_for('settings') }}" class="nav-item {% if active_page == 'settings' %}active{% endif %}">
+                <i class="fas fa-cog"></i>
+                <span>Settings</span>
+            </a>
+            <div class="nav-divider"></div>
+            <a href="{{ url_for('logout') }}" class="nav-item logout-item {% if active_page == 'logout' %}active{% endif %}">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </a>
+        </nav>
+    </aside>
+
+    <div class="main-content" id="mainContent">
+        <header class="top-header">
+            <div class="header-left">
+                <button class="hamburger" id="hamburger">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+            <div class="header-right">
+<button class="header-btn notification-btn" onclick="openNotifications()" title="Notifications" aria-label="Notifications">
+                      <i class="fas fa-bell"></i>
+                      <span class="notification-badge" id="notifBadge">3</span>
+                  </button>
+<button class="header-btn" id="messageButton" onclick="openMessageDialog()" title="Messages" aria-label="Messages" style="position:relative;">
+                      <i class="fas fa-envelope"></i>
+                      <span class="notification-badge" id="msgBadge" style="display:none;position:absolute;top:2px;right:2px;font-size:8px;padding:2px 5px;background:#b44747;color:#fff;border-radius:8px;min-width:16px;text-align:center;"></span>
+                  </button>
+                <button class="header-btn" id="fullscreenButton" title="Toggle fullscreen" aria-label="Toggle fullscreen">
+                    <i class="fas fa-expand"></i>
+                </button>
+                <div class="user-profile" id="userProfileBox" title="View profile" role="button" tabindex="0">
+                    <div class="user-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="user-info">
+                        <span class="user-name">{{ current_user_name or 'admin' }}</span>
+                        <span class="user-role">{{ (current_user_role or 'admin')|capitalize }}</span>
+                    </div>
+                    <div class="profile-dropdown" id="profileDropdown">
+                        <div class="pd-head">
+                            <div class="pd-avatar"><i class="fas fa-user"></i></div>
+                            <div class="pd-headtext">
+                                <div class="pd-name">{{ current_user_name or 'Administrator' }}</div>
+                                <div class="pd-sub">{{ (current_user_role or 'admin')|capitalize }}</div>
+                            </div>
+                        </div>
+                        <div class="pd-divider"></div>
+                        <div class="pd-current">
+                            <div class="pd-users-head"><i class="fas fa-circle pd-live-dot"></i>Currently Logged In · User Portal</div>
+                            {% if active_user and active_user.login_id %}
+                            <div class="pd-user-card current">
+                                <div class="pd-user-top">
+                                    <b>{{ active_user.full_name }}</b>
+                                    <span class="pd-tag online">Online</span>
+                                </div>
+                                <div class="pd-user-row"><span>Login ID</span>{{ active_user.login_id }}</div>
+                                <div class="pd-user-row"><span>Phone</span>{{ active_user.phone or '—' }}</div>
+                                <div class="pd-user-row"><span>Shift</span>{{ (active_user.shift|capitalize) if active_user.shift else '—' }}</div>
+                                <div class="pd-user-row"><span>Logged in at</span>{{ active_user.at or '—' }}</div>
+                            </div>
+                            {% else %}
+                            <div class="pd-empty">No user is currently logged in on the user portal.</div>
+                            {% endif %}
+                        </div>
+                        <div class="pd-divider"></div>
+                        <div class="pd-body">
+                            <div class="pd-row"><span>Login ID</span><b>{{ current_user_login or '—' }}</b></div>
+                            <div class="pd-row"><span>Full Name</span><b>{{ current_user_name or '—' }}</b></div>
+                            <div class="pd-row"><span>Phone</span><b>{{ current_user_phone or '—' }}</b></div>
+                            <div class="pd-row"><span>Role</span><b>{{ (current_user_role or 'admin')|capitalize }}</b></div>
+                            {% if current_user_created %}<div class="pd-row"><span>Member since</span><b>{{ current_user_created }}</b></div>{% endif %}
+                        </div>
+                        <div class="pd-divider"></div>
+                        <div class="pd-users">
+                            <div class="pd-users-head">Registered User Accounts ({{ profile_users|length }})</div>
+                            <div class="pd-users-list">
+                                {% for u in profile_users %}
+                                <div class="pd-user-card">
+                                    <div class="pd-user-top">
+                                        <b>{{ u.full_name }}</b>
+                                        {% if active_user and active_user.id and u.id == active_user.id %}<span class="pd-tag online">Online</span>{% else %}<span class="pd-tag">{{ (u.role or 'user')|capitalize }}</span>{% endif %}
+                                    </div>
+                                    <div class="pd-user-row"><span>Login ID</span>{{ u.login_id }}</div>
+                                    <div class="pd-user-row"><span>Phone</span>{{ u.phone or '—' }}</div>
+                                    {% if u.shift %}<div class="pd-user-row"><span>Shift</span>{{ u.shift|capitalize }}</div>{% endif %}
+                                    <div class="pd-user-row"><span>Joined</span>{{ u.created or '—' }}</div>
+                                </div>
+                                {% else %}
+                                <div class="pd-empty">No users registered yet.</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="pd-divider"></div>
+                        <a class="pd-item" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                    </div>
+                </div>
+            </div>
+        </header>
+        <div id="presenceBar" style="display:none;background:#fff8e1;border-bottom:1px solid #f5d48a;color:#7c4a03;padding:10px 24px;font-size:13px;">
+            <i class="fas fa-users" style="margin-right:8px;"></i><span id="presenceText"></span>
+        </div>
+        <main class="page-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <div class="modal-overlay" id="notifDialog" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.45);align-items:center;justify-content:center;z-index:2000;padding:20px;">
+      <div style="background:#fff;border-radius:14px;width:100%;max-width:520px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 30px 60px rgba(0,0,0,.35);">
+        <div style="display:flex;align-items:center;gap:10px;padding:18px 20px;border-bottom:1px solid var(--border);">
+          <div style="width:38px;height:38px;border-radius:10px;background:#e7f5ea;color:#1c5c37;display:flex;align-items:center;justify-content:center;font-size:16px;"><i class="fas fa-bell"></i></div>
+          <div style="flex:1;"><h3 style="margin:0;font-size:16px;">Notifications</h3><div style="font-size:12px;color:var(--text-light);" id="notifSub"></div></div>
+          <button class="btn btn-sm" id="notifSelectBtn" type="button" onclick="toggleNotifSelectMode()" style="display:none;background:#e7f5ea;color:#1c5c37;border-color:#bfe0c7;"><i class="fas fa-check-double"></i> Select</button>
+        </div>
+        <div id="notifList" style="padding:14px 16px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;"></div>
+        <div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <button class="btn btn-secondary" onclick="closeModal('notifDialog')"><i class="fas fa-arrow-left"></i> Back</button>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button class="btn btn-sm" style="background:#fbecec;color:#b44747;border-color:#f5d9d9;" onclick="clearNotifications()"><i class="fas fa-trash-can"></i> Clear All</button>
+            <button class="btn btn-sm" id="notifDeleteBtn" type="button" onclick="deleteSelectedNotifications()" disabled style="background:#fbecec;color:#b44747;border-color:#f5d9d9;opacity:.5;"><i class="fas fa-trash"></i> Delete</button>
+          </div>
+        </div>
+      </div>
+</div>
+
+<div class="modal-overlay" id="messageDialog" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.5);align-items:center;justify-content:center;z-index:3000;padding:20px;">
+  <div style="background:#fff;border-radius:14px;width:100%;max-width:460px;box-shadow:0 20px 50px rgba(0,0,0,.3);">
+    <div style="display:flex;align-items:center;gap:10px;padding:18px 20px;border-bottom:1px solid var(--border);">
+      <div style="width:38px;height:38px;border-radius:10px;background:#e6edfd;color:#1d4ed8;display:flex;align-items:center;justify-content:center;font-size:16px;"><i class="fas fa-envelope"></i></div>
+      <div style="flex:1;"><h3 style="margin:0;font-size:16px;">Messages</h3><div style="font-size:12px;color:var(--text-light);" id="msgSub">0 messages</div></div>
+      <button onclick="closeModal('messageDialog')" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text-light);"><i class="fas fa-times"></i></button>
+    </div>
+    <div id="msgList" style="padding:14px 16px;overflow-y:auto;max-height:40vh;"></div>
+    <div style="border-top:1px solid var(--border);padding:18px 20px;">
+       <textarea id="messageText" rows="3" placeholder="Type your message here..." style="width:100%;border:1px solid #cfd5d1;border-radius:7px;padding:10px 12px;font-size:13px;resize:vertical;font-family:inherit;color:#303734;box-sizing:border-box;"></textarea>
+       <div id="msgStatus" style="font-size:11px;color:var(--text-light);margin-top:8px;"></div>
+       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+         <button class="btn btn-secondary" onclick="closeModal('messageDialog')">Cancel</button>
+         <button class="btn btn-primary" onclick="sendMessage()"><i class="fas fa-paper-plane"></i> Send</button>
+       </div>
+     </div>
+  </div>
+ </div>
+ 
+
+<div class="modal-overlay" id="newItemDialog" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.5);align-items:center;justify-content:center;z-index:3000;padding:20px;">
+  <div style="background:#fff;border-radius:14px;width:100%;max-width:420px;padding:28px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.3);">
+    <div style="width:56px;height:56px;border-radius:50%;background:#e7f5ea;color:#1c5c37;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 16px;">
+      <i class="fas fa-check-circle"></i>
+    </div>
+    <h3 style="margin:0 0 8px;font-size:18px;color:#1c5c37;">Item Created Successfully</h3>
+    <p style="font-size:13px;color:#66756c;margin:0 0 24px;">The new item has been added. Refresh the page to see it displayed in the user and admin panels.</p>
+    <div style="display:flex;gap:10px;justify-content:center;">
+      <button class="btn btn-primary" onclick="refreshPage()"><i class="fas fa-sync-alt"></i> Refresh Page</button>
+    </div>
+    <p style="font-size:11px;color:#818883;margin:16px 0 0;">Save your formula first, then refresh for the changes to take effect.</p>
+  </div>
+</div>
+
+<div class="modal-overlay" id="refreshDialog" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.55);align-items:center;justify-content:center;z-index:4000;padding:20px;">
+  <div style="background:#fff;border-radius:14px;width:100%;max-width:420px;padding:26px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.3);">
+    <div style="width:56px;height:56px;border-radius:50%;background:#fff8e1;color:#b45309;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 16px;">
+      <i class="fas fa-rotate"></i>
+    </div>
+    <h3 style="margin:0 0 8px;font-size:17px;color:#36443b;">Data Updated</h3>
+    <p style="font-size:13px;color:#66756c;margin:0 0 6px;line-height:1.6;">The <strong>User</strong> has updated the data.<br>Please refresh your page.</p>
+    <p style="font-size:12px;color:#66756c;margin:0 0 6px;line-height:1.6;">Or the page will automatically refresh in <strong><span id="refreshCountdown">10</span> seconds</strong>.</p>
+    <p style="font-size:11.5px;color:#8a938d;margin:0 0 22px;line-height:1.5;">You are still logged in — refreshing keeps your session.</p>
+    <div style="display:flex;gap:10px;justify-content:center;">
+      <button class="btn btn-primary" onclick="doAdminRefresh()"><i class="fas fa-sync-alt"></i> Refresh Now</button>
+      <button class="btn btn-secondary" onclick="dismissRefreshDialog()">Later</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const NOTIF_TONE = {
+      warn: {bg:'#fef3e0', fg:'#b45309'},
+      danger: {bg:'#fbecec', fg:'#b44747'},
+      info: {bg:'#e6edfd', fg:'#1d4ed8'}
+    };
+    let notifItems = [];
+    let notifSelectMode = false;
+    let notifSelected = {};
+    async function refreshNotifBadge(){
+      try {
+        const res = await fetch('/api/notifications');
+        const data = await res.json();
+        if(data.success){
+          const badge = document.getElementById('notifBadge');
+          if(badge){
+            badge.textContent = data.count;
+            badge.style.display = data.count ? '' : 'none';
+          }
+        }
+      } catch(e){}
+    }
+    function renderNotifications(){
+      const list = document.getElementById('notifList');
+      if(!notifItems.length){
+        list.innerHTML = '<div style="text-align:center;color:var(--text-light);padding:26px;font-size:13px;"><i class="fas fa-check-circle" style="font-size:26px;color:#2e9e5b;"></i><div style="margin-top:8px;">All clear — no new notifications.</div></div>';
+        syncNotifControls();
+        return;
+      }
+      document.getElementById('notifSub').textContent = notifItems.length + ' notification(s)';
+      list.innerHTML = notifItems.map(n=>{
+          const tone = NOTIF_TONE[n.tone] || NOTIF_TONE.info;
+          const checked = notifSelected[n.id] ? ' checked' : '';
+          const checkbox = notifSelectMode
+            ? '<label style="display:flex;align-items:center;cursor:pointer;flex-shrink:0;">'
+              + '<input type="checkbox" class="notif-cb" data-id="' + n.id + '"' + checked
+              + ' style="width:16px;height:16px;accent-color:#1c5c37;cursor:pointer;" onclick="event.stopPropagation(); updateNotifSelection(this)"></label>'
+            : '';
+          const selected = notifSelectMode && notifSelected[n.id] ? ';border-color:#1c5c37;background:#f0faf2;' : '';
+          return '<div data-id="' + n.id + '" class="notif-item" onclick="onNotifCardClick(this)" style="display:flex;gap:12px;align-items:flex-start;background:#f8faf9;border:1px solid var(--border);border-radius:10px;padding:12px 14px;cursor:' + (notifSelectMode ? 'pointer' : 'default') + selected + '">'
+            + checkbox
+            + '<div style="width:34px;height:34px;border-radius:9px;background:' + tone.bg + ';color:' + tone.fg + ';display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;"><i class="fas ' + n.icon + '"></i></div>'
+            + '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;">' + n.title + '</div>'
+            + '<div style="font-size:12.5px;color:var(--text-medium);line-height:1.5;">' + n.text + '</div>'
+            + '<div style="font-size:11px;color:var(--text-light);margin-top:3px;">' + n.time + '</div></div></div>';
+        }).join('');
+      syncNotifControls();
+    }
+    function onNotifCardClick(el){
+      if(!notifSelectMode) return;
+      const cb = el.querySelector('.notif-cb');
+      if(cb){ cb.checked = !cb.checked; updateNotifSelection(cb); }
+    }
+    function updateNotifSelection(cb){
+      const id = cb.getAttribute('data-id');
+      notifSelected[id] = cb.checked;
+      const card = cb.closest('.notif-item');
+      if(card){
+        if(cb.checked){ card.style.borderColor = '#1c5c37'; card.style.background = '#f0faf2'; }
+        else { card.style.borderColor = ''; card.style.background = ''; }
+      }
+      syncNotifControls();
+    }
+    function toggleNotifSelectMode(){
+      notifSelectMode = !notifSelectMode;
+      if(!notifSelectMode){ notifSelected = {}; }
+      syncNotifControls();
+      renderNotifications();
+    }
+    function syncNotifControls(){
+      const selBtn = document.getElementById('notifSelectBtn');
+      const delBtn = document.getElementById('notifDeleteBtn');
+      if(selBtn){
+        selBtn.style.display = notifItems.length ? '' : 'none';
+        selBtn.innerHTML = notifSelectMode ? '<i class="fas fa-times"></i> Done' : '<i class="fas fa-check-double"></i> Select';
+      }
+      if(delBtn){
+        const selCount = Object.keys(notifSelected).filter(k=>notifSelected[k]).length;
+        delBtn.disabled = !notifSelectMode || selCount === 0;
+        delBtn.style.opacity = delBtn.disabled ? '.5' : '1';
+        delBtn.style.cursor = delBtn.disabled ? 'not-allowed' : 'pointer';
+      }
+    }
+    async function openNotifications(){
+      const list = document.getElementById('notifList');
+      list.innerHTML = '<div style="text-align:center;color:var(--text-light);padding:26px;font-size:13px;">Loading notifications…</div>';
+      openModal('notifDialog');
+      try {
+        const res = await fetch('/api/notifications');
+        const data = await res.json();
+        if(!data.success){ throw new Error(data.error || 'Load failed'); }
+        notifItems = data.notifications || [];
+        notifSelectMode = false;
+        notifSelected = {};
+        renderNotifications();
+        refreshNotifBadge();
+      } catch(e){
+        list.innerHTML = '<div style="text-align:center;color:#b44747;padding:26px;font-size:13px;">Could not load notifications. Please retry.</div>';
+        syncNotifControls();
+      }
+    }
+    async function deleteSelectedNotifications(){
+      const keys = Object.keys(notifSelected).filter(k=>notifSelected[k]);
+      if(!keys.length){ return; }
+      if(!confirm('Delete ' + keys.length + ' selected notification(s)?')) return;
+      try {
+        const res = await fetch('/api/notifications/delete', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({keys: keys})});
+        const data = await res.json();
+        if(data.success){
+          const gone = new Set(keys);
+          notifItems = notifItems.filter(n=>!gone.has(n.id));
+          notifSelected = {};
+          notifSelectMode = false;
+          renderNotifications();
+          refreshNotifBadge();
+        } else {
+          alert(data.error || 'Unable to delete');
+        }
+      } catch(e){ alert('Delete failed: ' + e.message); }
+    }
+    async function clearNotifications(){
+      try {
+        const res = await fetch('/api/notifications/clear', {method:'POST'});
+        const data = await res.json();
+        if(data.success){
+          notifItems = [];
+          notifSelected = {};
+          notifSelectMode = false;
+          renderNotifications();
+          refreshNotifBadge();
+        }
+      } catch(e){}
+    }
+    document.addEventListener('DOMContentLoaded', refreshNotifBadge);
+
+    /* Multi-user presence: warn if another user is on the same page */
+    (function presence(){
+      let tab = sessionStorage.getItem('saviTabId');
+      if(!tab){ tab = 'tab-' + Math.random().toString(36).slice(2, 10); sessionStorage.setItem('saviTabId', tab); }
+      let label = localStorage.getItem('saviUserLabel');
+      if(!label){ label = 'User-' + Math.random().toString(36).slice(2, 6).toUpperCase(); localStorage.setItem('saviUserLabel', label); }
+      let alerted = false;
+      async function beat(){
+        try {
+          const res = await fetch('/api/presence', {method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({tab: tab, page: window.location.pathname, label: label})});
+          const data = await res.json();
+          const bar = document.getElementById('presenceBar');
+          if(data.success && data.others && data.others.length){
+            const names = data.others.map(o=>o.label).join(', ');
+            document.getElementById('presenceText').innerHTML = '<strong>' + names + '</strong> is also using this page right now as <strong>' + data.you + '</strong>. Please wait or coordinate before saving, to avoid overwriting each other.';
+            bar.style.display = '';
+            if(!alerted){ alerted = true; alert('Notice: ' + names + ' is also on this page. Please wait or coordinate before making changes.'); }
+          } else {
+            if(bar) bar.style.display = 'none';
+            if(!data.others || !data.others.length) alerted = false;
+          }
+        } catch(e){}
+      }
+      beat();
+      setInterval(beat, 15000);
+    })();
+
+    /* Leaf page loader: visible on every page load, and shown again
+       whenever the user navigates (links / form submits). */
+    function hidePageLoader(){
+      const loader = document.getElementById('pageLoader');
+      if(loader) loader.classList.add('hide');
+    }
+    function showPageLoader(){
+      const loader = document.getElementById('pageLoader');
+      if(loader) loader.classList.remove('hide');
+    }
+    window.addEventListener('load', ()=> setTimeout(hidePageLoader, 350));
+    setTimeout(hidePageLoader, 4000); /* safety: never trap the page */
+    document.addEventListener('click', (e)=>{
+      const a = e.target.closest('a[href]');
+      if(!a) return;
+      const href = a.getAttribute('href') || '';
+      if(!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+      /* File downloads (backup, excel, pdf, csv exports) are not page loads */
+      if(href.startsWith('blob:') || href.startsWith('data:')) return;
+      if(a.hasAttribute('download')) return;
+      if(a.target === '_blank' || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      if(a.origin !== window.location.origin) return;
+      showPageLoader();
+    });
+    document.addEventListener('submit', ()=> showPageLoader());
+
+    /* Profile dropdown */
+    (function(){
+      const box = document.getElementById('userProfileBox');
+      const dd = document.getElementById('profileDropdown');
+      if(!box || !dd) return;
+      box.addEventListener('click', (e)=>{
+        if(e.target.closest('a')) return;
+        e.stopPropagation();
+        dd.classList.toggle('open');
+      });
+      box.addEventListener('keydown', (e)=>{
+        if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); dd.classList.toggle('open'); }
+      });
+      document.addEventListener('click', (e)=>{
+        if(!box.contains(e.target)) dd.classList.remove('open');
+      });
+    })();
+    </script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+<script>
+function toggleThirdPartyMenu(btn){
+  const menu=document.getElementById('thirdPartyMenu');
+  if(!menu) return;
+  const open=menu.style.display!=='none';
+  menu.style.display=open?'none':'block';
+  const arrow=document.getElementById('thirdPartyArrow');
+  if(arrow) arrow.className=open?'fas fa-chevron-down':'fas fa-chevron-up';
+}
+async function toggleProductionThirdPartyMenu(btn){
+  const menu = document.getElementById('productionThirdPartyMenu');
+  const arrow = document.getElementById('productionThirdPartyArrow');
+  if(!menu) return;
+  const open = menu.style.display !== 'none';
+  menu.style.display = open ? 'none' : 'block';
+  if(arrow) arrow.style.transform = open ? 'rotate(0deg)' : 'rotate(180deg)';
+}
+
+async function addNewThirdPartyProduct(){
+  const name=prompt('Enter 3rd party product name:');
+  if(!name || !name.trim()) return;
+  try{
+    const res=await fetch('/api/third-party-items',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name.trim(),materials:[],price:0})});
+    const data=await res.json();
+    if(!res.ok || !data.success) throw new Error(data.error || 'Unable to create 3rd party product');
+    window.location.href='{{ url_for('formulas') }}?list='+encodeURIComponent(data.item.name);
+  }catch(err){ alert(err.message); }
+}
+
+async function addNewFormulaProduct(){
+  const name=prompt('Enter new product name:');
+  if(!name || !name.trim()) return;
+  try{
+    const res=await fetch('/api/products',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name.trim(),category:'Finished Goods',price:0,stock:0})});
+    const data=await res.json();
+    if(!res.ok || !data.success) throw new Error(data.error || 'Unable to create product');
+    openNewItemDialog();
+  }catch(err){ alert(err.message); }
+}
+
+async function deleteProduct(name, id){
+  if(!id){ alert('Unable to delete "' + name + '"'); return; }
+  if(!confirm('Delete product "' + name + '"?\n\nThis removes the product and all its related data (formula, materials, production, consumption).')) return;
+  try{
+    const res=await fetch('/api/products/' + id, {method:'DELETE'});
+    const data=await res.json();
+    if(!res.ok || !data.success) throw new Error(data.error || 'Unable to delete product');
+    location.reload();
+  }catch(err){ alert(err.message); }
+}
+
+async function deleteThirdPartyProduct(name, id){
+  if(!id){ alert('Unable to delete "' + name + '"'); return; }
+  if(!confirm('Delete 3rd party product "' + name + '"?\n\nThis removes the 3rd party product and its related data.')) return;
+  try{
+    const res=await fetch('/api/third-party-items/' + id, {method:'DELETE'});
+    const data=await res.json();
+    if(!res.ok || !data.success) throw new Error(data.error || 'Unable to delete 3rd party product');
+    location.reload();
+  }catch(err){ alert(err.message); }
+}
+
+function openNewItemDialog(){
+  openModal('newItemDialog');
+}
+
+function refreshPage(){
+   location.reload();
+ }
+
+ async function checkNewMessage(){
+   try {
+     const res = await fetch('/api/messages/status');
+     const data = await res.json();
+     if(data.success){
+       const badge = document.getElementById('msgBadge');
+       if(data.unread_count > 0){
+         if(badge){ badge.textContent = data.unread_count; badge.style.display = ''; }
+       } else {
+         if(badge) badge.style.display = 'none';
+       }
+     }
+   } catch(e){}
+ }
+
+ function renderMsgList(msgs){
+      const list = document.getElementById('msgList');
+      if(!msgs.length){
+        list.innerHTML = '<div style="text-align:center;color:var(--text-light);padding:26px;font-size:13px;"><i class="fas fa-check-circle" style="font-size:26px;color:#2e9e5b;"></i><div style="margin-top:8px;">No messages yet.</div></div>';
+        document.getElementById('msgSub').textContent = '0 messages';
+        return;
+      }
+      const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      const fromUser = m => (m.sender || 'Admin') === 'User';
+      const seen = m => Array.isArray(m.seen_by) ? m.seen_by : String(m.seen_by || '').split(',');
+      const unreadUser = msgs.filter(m=>!fromUser(m) && !seen(m).includes('User')).length;
+      const unreadAdmin = msgs.filter(m=>fromUser(m) && !seen(m).includes('Admin')).length;
+      const parts = [];
+      if(unreadUser) parts.push(unreadUser + ' unread by user');
+      if(unreadAdmin) parts.push(unreadAdmin + ' new from user');
+      document.getElementById('msgSub').textContent = msgs.length + ' message' + (msgs.length!=1?'s':'') + (parts.length ? ' — ' + parts.join(', ') : '');
+      list.innerHTML = '';
+      msgs.forEach(m=>{
+        const isIncoming = fromUser(m);
+        const isSeen = isIncoming ? seen(m).includes('Admin') : seen(m).includes('User');
+        const card = document.createElement('div');
+        card.style.cssText = 'display:flex;gap:12px;align-items:flex-start;background:' + (isSeen ? '#f8faf9' : '#fef3e0') + ';border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;';
+        const statusText = isIncoming
+          ? (isSeen ? 'From user · acknowledged' : 'From user · not acknowledged yet')
+          : (isSeen ? 'Seen by user' : 'Not seen yet');
+        card.innerHTML = '<div style="flex:1;min-width:0;">'
+            + '<div style="font-size:10.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:' + (isIncoming ? '#1c5c37' : '#8a6d1a') + ';">' + (isIncoming ? 'From user' : 'Admin') + '</div>'
+            + '<div style="font-size:13px;font-weight:700;">' + esc(m.text) + '</div>'
+            + '<div style="font-size:11px;color:var(--text-light);margin-top:3px;">' + statusText + ' · ' + esc(m.time || '') + '</div></div>'
+            + (isIncoming && !isSeen ? '<button class="btn btn-sm btn-secondary" data-id="' + parseInt(m.id, 10) + '" onclick="markMsgSeen(this)">Mark seen</button>' : '')
+            + '<button class="btn btn-sm" type="button" title="Delete message" style="background:#fdecea;color:#b3261e;border-color:#f2c4c0;" onclick="deleteMsg(' + parseInt(m.id, 10) + ')"><i class="fas fa-trash"></i></button>';
+        list.appendChild(card);
+      });
+    }
+    function markMsgSeen(btn){
+      fetch('/api/messages/seen', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({label:'Admin', id:parseInt(btn.dataset.id,10)})})
+        .then(r=>r.json()).then(d=>{ if(d.success) openMessageDialog(); }).catch(()=>{});
+    }
+    async function deleteMsg(id){
+      if(!confirm('Delete this message? This cannot be undone.')) return;
+      try{
+        const res = await fetch('/api/messages/' + id, {method:'DELETE'});
+        let data = null;
+        try{ data = await res.json(); }catch(e){}
+        if(!res.ok || (data && data.success === false)){
+          alert((data && data.error) || 'Unable to delete the message.');
+          return;
+        }
+        if(data && data.messages){ renderMsgList(data.messages); } else { openMessageDialog(); }
+      }catch(e){
+        alert('Could not reach the server. Check your connection and try again.');
+      }
+    }
+    function openMessageDialog(){
+      openModal('messageDialog');
+      const list = document.getElementById('msgList');
+      list.innerHTML = '<div style="text-align:center;color:var(--text-light);padding:26px;font-size:13px;">Loading messages…</div>';
+      fetch('/api/messages').then(r=>r.json()).then(data=>{
+        if(data.success && data.messages){
+          renderMsgList(data.messages);
+        } else {
+          list.innerHTML = '<div style="text-align:center;color:#b44747;padding:26px;font-size:13px;">Could not load messages.</div>';
+        }
+      }).catch(e=>{
+        list.innerHTML = '<div style="text-align:center;color:#b44747;padding:26px;font-size:13px;">Could not load messages.</div>';
+      });
+    }
+    async function sendMessage(){
+      const text = document.getElementById('messageText').value.trim();
+      if(!text){ alert('Please enter a message'); return; }
+      try {
+        const res = await fetch('/api/messages/send', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:text})});
+        const data = await res.json();
+        if(data.success){
+          document.getElementById('messageText').value = '';
+          openMessageDialog();
+        }
+      } catch(e){ alert('Failed to send message'); }
+    }
+    async function checkAdminUnreadMessages(){
+      try {
+        const res = await fetch('/api/messages/status');
+        const data = await res.json();
+        if(data.success){
+          const badge = document.getElementById('msgBadge');
+          if(data.unread_count > 0){
+            if(badge){ badge.textContent = data.unread_count; badge.style.display = ''; }
+          } else {
+            if(badge) badge.style.display = 'none';
+          }
+        }
+      } catch(e){}
+    }
+setInterval(checkNewMessage, 10000);
+    setInterval(checkAdminUnreadMessages, 10000);
+
+    let adminChangeVersion = null;
+    let refreshDialogHiddenUntil = 0;
+    let refreshTimer = null;
+    let refreshCountLeft = 10;
+    function clearRefreshTimer(){
+      if(refreshTimer){ clearInterval(refreshTimer); refreshTimer = null; }
+      const c = document.getElementById('refreshCountdown');
+      if(c) c.textContent = '10';
+      refreshCountLeft = 10;
+    }
+    function doAdminRefresh(){ location.reload(); }
+    function dismissRefreshDialog(){
+      clearRefreshTimer();
+      const el = document.getElementById('refreshDialog');
+      if(el) el.style.display = 'none';
+      if(el && el.dataset.pendingVersion) adminChangeVersion = parseInt(el.dataset.pendingVersion, 10);
+      refreshDialogHiddenUntil = Date.now() + 60000;
+    }
+    async function checkAdminChangeMonitor(){
+      try {
+        const res = await fetch('/api/change-monitor');
+        const data = await res.json();
+        if(!data.success) return;
+        const v = parseInt(data.version || 0, 10);
+        if(adminChangeVersion === null){ adminChangeVersion = v; return; }
+        if(v > adminChangeVersion && Date.now() > refreshDialogHiddenUntil){
+          const el = document.getElementById('refreshDialog');
+          if(el){
+            el.dataset.pendingVersion = v;
+            el.style.display = 'flex';
+            clearRefreshTimer();
+            refreshTimer = setInterval(function(){
+              const c = document.getElementById('refreshCountdown');
+              if(c) c.textContent = String(Math.max(0, --refreshCountLeft));
+              if(refreshCountLeft <= 0){ clearRefreshTimer(); doAdminRefresh(); }
+            }, 1000);
+          }
+        }
+      } catch(e){}
+    }
+    setInterval(checkAdminChangeMonitor, 5000);
+</script>
+</body>
+</html>

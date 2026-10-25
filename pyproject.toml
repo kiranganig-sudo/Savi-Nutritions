@@ -1,0 +1,13 @@
+[project]
+name = "savi-nutrition"
+version = "1.0.0"
+description = "Savi Nutrition admin and user portals"
+requires-python = ">=3.10"
+dependencies = [
+    "Flask>=3.0,<4",
+    "Flask-SQLAlchemy>=3.1,<4",
+    "openpyxl>=3.1,<4",
+    "reportlab>=4,<5",
+    "PyMySQL>=1.1,<2",
+    "waitress>=3,<4",
+]

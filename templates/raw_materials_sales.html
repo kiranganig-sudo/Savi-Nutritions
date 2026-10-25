@@ -1,0 +1,308 @@
+{% extends "base.html" %}
+{% block title %}Raw Materials Sales{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Raw Materials Sales</span></div>
+        <h1 class="page-title">Raw Materials Sales</h1>
+        <div class="page-subtitle">Sell raw materials from stock. Closing stock = opening + purchases - consumed - sales.</div>
+    </div>
+    <div class="export-actions" style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" type="button" onclick="exportTable('rmSalesTable','raw_materials_sales_export')"><i class="fas fa-download"></i> Export</button>
+        <button class="btn btn-primary" type="button" onclick="openRmsModal()"><i class="fas fa-plus"></i> Add Sales</button>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Sale Records</div>
+        <div class="filter-bar">
+            <div class="filter-input"><i class="fas fa-search"></i><input type="text" placeholder="Search sales..." oninput="searchTable(this,'rmSalesTable')" aria-label="Search raw material sales"></div>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="rmSalesTable">
+            <thead><tr><th>Sl.No</th><th>Invoice Number</th><th>Customer Name</th><th>Customer Contact Number</th><th>Material</th><th>Actual Quantity</th><th>Quantity in Bill</th><th>Date</th><th>Invoice</th><th>Amount Received (₹)</th><th>Balance Amount (₹)</th><th>Total Amount (₹)</th><th style="width:60px;">Action</th></tr></thead>
+            <tbody>
+            {% for sale in sales %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ sale.invoice_number or '—' }}</td>
+                    <td><strong>{{ sale.buyer or '—' }}</strong></td>
+                    <td>{{ sale.customer_contact or '—' }}</td>
+                    <td>{{ sale.material }}</td>
+                    <td>{{ sale.quantity }} kg</td>
+                    <td>{{ sale.bill_quantity }} kg</td>
+                    <td><strong>{{ sale.date or '—' }}</strong></td>
+                    <td>{% if sale.invoice_attachment %}<a href="{{ url_for('sales_invoice', filename=sale.invoice_attachment) }}" target="_blank" rel="noopener"><i class="fas fa-paperclip"></i> View</a>{% else %}—{% endif %}</td>
+                    <td>{{ sale.amount }}</td>
+                    <td>{{ sale.balance_amount }}</td>
+                    <td>{{ sale.total_amount }}</td>
+                    <td><div class="row-actions"><button class="action-btn" type="button" title="Edit sale" style="color:#1f6fb2;" onclick="editRmsSale('{{ sale.id }}')"><i class="fas fa-pen"></i></button><button class="action-btn" type="button" title="Delete sale" style="color:#d32f2f;" onclick="deleteRmsSale('{{ sale.id }}')"><i class="fas fa-trash"></i></button></div></td>
+                </tr>
+            {% else %}
+                <tr><td colspan="13"><div class="empty-state"><i class="fas fa-sack-dollar"></i><h3>No raw material sales yet</h3><p>Use "Add Sales" to record a sale — the quantity is deducted from stock.</p></div></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="pagination" style="padding:16px 20px;"><div class="pagination-info">Showing {{ sales|length }} sale record(s)</div></div>
+</div>
+
+<div class="modal-overlay" id="rmsModal" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.45);align-items:center;justify-content:center;z-index:100;padding:20px;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:560px;padding:22px;max-height:90vh;overflow-y:auto;">
+    <h3 style="margin:0 0 4px;" id="rmsModalTitle">Add Raw Material Sale</h3>
+    <p style="font-size:12px;color:#66756c;margin:0 0 16px;">The sold quantity is subtracted from the material's closing stock.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group"><label class="form-label">Invoice Number</label>
+        <input class="form-control" id="rmsInvNo" maxlength="60" placeholder="e.g. INV-1024" autocomplete="off" data-con="invoice">
+      </div>
+      <div class="form-group"><label class="form-label">Date *</label>
+        <input class="form-control" id="rmsDate" type="date" required>
+      </div>
+      <div class="form-group"><label class="form-label">Material *</label>
+        <select class="form-control" id="rmsMaterial" required onchange="rmsStockHint()">
+          <option value="" selected disabled>Select material</option>
+          {% for m in materials %}
+          <option value="{{ m.name }}" data-stock="{{ m.closing }}">{{ m.name }}</option>
+          {% endfor %}
+        </select>
+        <div style="font-size:11px;color:#8a988f;margin-top:4px;" id="rmsStockHint">Current stock shows after selecting a material.</div>
+      </div>
+      <div class="form-group"><label class="form-label">Customer Name</label>
+        <input class="form-control" id="rmsBuyer" maxlength="120" placeholder="e.g. Krishna Traders" autocomplete="off" data-con="name">
+      </div>
+      <div class="form-group"><label class="form-label">Customer Contact Number</label>
+        <input class="form-control" id="rmsContact" maxlength="10" inputmode="numeric" pattern="[0-9]{10}" title="Exactly 10 digits (0-9)" placeholder="10 digits, 0-9" autocomplete="off" data-con="phone">
+      </div>
+      <div class="form-group"><label class="form-label">Actual Quantity (kg) *</label>
+        <input class="form-control" id="rmsQty" type="number" min="1" step="1" placeholder="e.g. 500" required>
+      </div>
+      <div class="form-group"><label class="form-label">Quantity in Bill (kg)</label>
+        <input class="form-control" id="rmsBillQty" type="number" min="0" step="1" placeholder="e.g. 500">
+      </div>
+      <div class="form-group"><label class="form-label">Amount Received (₹)</label>
+        <input class="form-control" id="rmsAmount" type="number" min="0" step="any" placeholder="e.g. 12000">
+      </div>
+      <div class="form-group"><label class="form-label">Balance Amount (₹)</label>
+        <input class="form-control" id="rmsBalance" type="number" min="0" step="any" placeholder="e.g. 5000">
+      </div>
+      <div class="form-group"><label class="form-label">Total Amount (₹)</label>
+        <input class="form-control" id="rmsTotal" type="number" min="0" step="any" placeholder="e.g. 17000">
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Invoice Attachment (JPG / PNG / PDF)</label>
+      <input class="form-control" id="rmsInvoice" type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf">
+      <div style="font-size:11px;color:#8a988f;margin-top:4px;">Optional. Max 4 MB. Photos are compressed automatically.</div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+      <button class="btn btn-secondary" onclick="closeModal('rmsModal')">Cancel</button>
+      <button class="btn btn-primary" id="rmsSaveBtn" onclick="saveRmsSale()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Change #54 (edit button): every row's data + edit-mode state. Built
+// field-by-field so attachment names (weighment etc.) stay out of the page
+// - the edit form only needs these values.
+const RMS_ROWS = [{% for s in sales %}{"id": {{ s.id }},
+  "date": {{ s.date|tojson }},
+  "material": {{ s.material|tojson }},
+  "quantity": {{ s.quantity }},
+  "amount": {{ s.amount }},
+  "buyer": {{ s.buyer|tojson }},
+  "customer_contact": {{ s.customer_contact|tojson }},
+  "invoice_number": {{ s.invoice_number|tojson }},
+  "bill_quantity": {{ s.bill_quantity }},
+  "balance_amount": {{ s.balance_amount }},
+  "total_amount": {{ s.total_amount }}}{% if not loop.last %},{% endif %}{% endfor %}];
+let editingRms = null;
+const SLIP_MAX_BYTES = 4 * 1024 * 1024;
+function prepareSlipFile(file){
+  return new Promise(resolve => {
+    const isImage = /^image\//.test(file.type || '');
+    if (!isImage || file.size <= 400 * 1024){ resolve({blob: file, name: file.name}); return; }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = function(){
+      URL.revokeObjectURL(url);
+      const maxSide = 1600;
+      let w = img.naturalWidth, h = img.naturalHeight;
+      if (Math.max(w, h) > maxSide){
+        const k = maxSide / Math.max(w, h);
+        w = Math.round(w * k); h = Math.round(h * k);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      canvas.toBlob(function(blob){
+        if (blob && blob.size && blob.size < file.size){
+          resolve({blob: blob, name: file.name.replace(/\.[^.]+$/, '') + '.jpg'});
+        } else {
+          resolve({blob: file, name: file.name});
+        }
+      }, 'image/jpeg', 0.85);
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); resolve({blob: file, name: file.name}); };
+    img.src = url;
+  });
+}
+function rmsStockHint(){
+  const sel = document.getElementById('rmsMaterial');
+  const opt = sel.options[sel.selectedIndex];
+  const hint = document.getElementById('rmsStockHint');
+  if (opt && opt.value){ hint.textContent = 'Current stock: ' + opt.dataset.stock + ' kg'; }
+  else { hint.textContent = 'Current stock shows after selecting a material.'; }
+}
+function salesExtensionOk(name){
+  return /\.(jpe?g|png|pdf)$/i.test(name || '');
+}
+async function prepareSalesFile(file){
+  if (/\.pdf$/i.test(file.name)) return {blob: file, name: file.name};
+  if (file.size <= 400000) return {blob: file, name: file.name};
+  return await prepareSlipFile(file);
+}
+function openRmsModal(){
+  editingRms = null;
+  document.getElementById('rmsModalTitle').textContent = 'Add Raw Material Sale';
+  const d = new Date();
+  const iso = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  document.getElementById('rmsDate').value = iso;
+  document.getElementById('rmsMaterial').value = '';
+  document.getElementById('rmsQty').value = '';
+  document.getElementById('rmsBillQty').value = '';
+  document.getElementById('rmsAmount').value = '';
+  document.getElementById('rmsBalance').value = '';
+  document.getElementById('rmsTotal').value = '';
+  document.getElementById('rmsBuyer').value = '';
+  document.getElementById('rmsContact').value = '';
+  document.getElementById('rmsInvNo').value = '';
+  document.getElementById('rmsInvoice').value = '';
+  rmsStockHint();
+  document.getElementById('rmsModal').style.display = 'flex';
+}
+// Change #54 (edit button): prefill the modal from the row and save via PUT.
+// The stock cap becomes closing + this row's own quantity when the material is
+// unchanged (the current closing already has this sale deducted).
+function editRmsSale(id){
+  const p = RMS_ROWS.find(x => String(x.id) === String(id));
+  if (!p){ return; }
+  editingRms = p.id;
+  document.getElementById('rmsModalTitle').textContent = 'Edit Raw Material Sale';
+  // Stored date is dd-mm-yyyy; the input is a native date picker (ISO).
+  const dateIso = /^\d{2}-\d{2}-\d{4}$/.test(p.date || '')
+    ? p.date.split('-').reverse().join('-') : '';
+  document.getElementById('rmsDate').value = dateIso;
+  const sel = document.getElementById('rmsMaterial');
+  let opt = Array.from(sel.options).find(o => o.value === p.material);
+  if (!opt && p.material){
+    opt = document.createElement('option');
+    opt.value = p.material; opt.textContent = p.material;
+    sel.appendChild(opt);
+  }
+  if (opt){ sel.value = p.material; }
+  document.getElementById('rmsInvNo').value = p.invoice_number || '';
+  document.getElementById('rmsBuyer').value = p.buyer || '';
+  document.getElementById('rmsContact').value = p.customer_contact || '';
+  document.getElementById('rmsQty').value = String(p.quantity || '');
+  document.getElementById('rmsBillQty').value = String(p.bill_quantity || '');
+  document.getElementById('rmsAmount').value = String(p.amount || '');
+  document.getElementById('rmsBalance').value = String(p.balance_amount || 0);
+  document.getElementById('rmsTotal').value = String(p.total_amount || 0);
+  document.getElementById('rmsInvoice').value = '';
+  rmsStockHint();
+  document.getElementById('rmsModal').style.display = 'flex';
+}
+async function prepareSalesAttachment(inputId, label){
+  const inp = document.getElementById(inputId);
+  if (!inp.files[0]) return null;
+  const rawFile = inp.files[0];
+  if (!salesExtensionOk(rawFile.name)){ alert(label + ' attachment must be a JPG, JPEG, PNG or PDF file'); return undefined; }
+  const prepared = await prepareSalesFile(rawFile);
+  if (prepared.blob.size > SLIP_MAX_BYTES){ alert(label + ' attachment is too large (max 4 MB)'); return undefined; }
+  return new File([prepared.blob], prepared.name, {type: prepared.blob.type || rawFile.type || 'application/octet-stream'});
+}
+async function saveRmsSale(){
+  const dateIso = document.getElementById('rmsDate').value;
+  if (!dateIso){ alert('Date is required'); return; }
+  const date = dateIso.split('-').reverse().join('-');
+  const material = document.getElementById('rmsMaterial').value;
+  if (!material){ alert('Material is required'); return; }
+  const qtyRaw = document.getElementById('rmsQty').value;
+  if (!qtyRaw){ alert('Actual Quantity is required'); return; }
+  const qty = Number(qtyRaw);
+  if (!Number.isInteger(qty) || qty <= 0){ alert('Actual Quantity must be a whole number more than 0'); return; }
+  const sel = document.getElementById('rmsMaterial');
+  const stock = Number(sel.options[sel.selectedIndex].dataset.stock || 0);
+  // On edit the current stock already excludes this row's old quantity.
+  const oldRow = editingRms ? RMS_ROWS.find(x => String(x.id) === String(editingRms)) : null;
+  const allowed = (oldRow && oldRow.material === material) ? stock + Number(oldRow.quantity || 0) : stock;
+  if (qty > allowed){ alert('Only ' + allowed + ' kg available in stock for ' + material); return; }
+  const contact = document.getElementById('rmsContact').value.trim();
+  if (contact && !/^[0-9]{10}$/.test(contact)){ alert('Customer contact number must be exactly 10 digits'); return; }
+  const billRaw = document.getElementById('rmsBillQty').value;
+  if (billRaw && (!Number.isInteger(Number(billRaw)) || Number(billRaw) < 0)){ alert('Quantity in Bill must be a whole number of 0 or more'); return; }
+  const amountRaw = document.getElementById('rmsAmount').value;
+  if (amountRaw && Number(amountRaw) < 0){ alert('Amount Received cannot be negative'); return; }
+  const balRaw = document.getElementById('rmsBalance').value;
+  if (balRaw && Number(balRaw) < 0){ alert('Balance Amount cannot be negative'); return; }
+  const totalRaw = document.getElementById('rmsTotal').value;
+  if (totalRaw && Number(totalRaw) < 0){ alert('Total Amount cannot be negative'); return; }
+  const invFile = await prepareSalesAttachment('rmsInvoice', 'Invoice');
+  if (invFile === undefined) return;
+  const form = new FormData();
+  form.append('date', date);
+  form.append('material', material);
+  form.append('quantity', String(qty));
+  if (billRaw) form.append('bill_quantity', billRaw);
+  if (amountRaw) form.append('amount', amountRaw);
+  if (balRaw) form.append('balance_amount', balRaw);
+  if (totalRaw) form.append('total_amount', totalRaw);
+  form.append('buyer', document.getElementById('rmsBuyer').value.trim());
+  form.append('customer_contact', contact);
+  form.append('invoice_number', document.getElementById('rmsInvNo').value.trim());
+  if (invFile) form.append('invoice_attachment', invFile);
+  const saveBtn = document.getElementById('rmsSaveBtn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving...';
+  try {
+    let res;
+    try {
+      // Change #54: same form, PUT to the row when editing.
+      res = await fetch(editingRms ? '/api/raw-materials-sales/' + editingRms : '/api/raw-materials-sales',
+                        {method: editingRms ? 'PUT' : 'POST', body: form});
+    } catch (e) {
+      alert('Could not reach the server. Check your connection and try again.');
+      return;
+    }
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (e) {
+      alert('Server error (HTTP ' + res.status + '). Please try again.');
+      return;
+    }
+    if(!res.ok || !data.success){ alert(data.error || 'Unable to save'); return; }
+    location.reload();
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save';
+  }
+}
+async function deleteRmsSale(id){
+  if (!confirm('Delete this sale? The quantity will be added back to stock.')) return;
+  try {
+    const res = await fetch('/api/raw-materials-sales/' + id, {method:'DELETE'});
+    let data = null;
+    try { data = await res.json(); } catch (e) {}
+    if (!res.ok || (data && data.success === false)){ alert((data && data.error) || 'Unable to delete'); return; }
+    location.reload();
+  } catch (e) {
+    alert('Could not reach the server. Check your connection and try again.');
+  }
+}
+</script>
+{% endblock %}

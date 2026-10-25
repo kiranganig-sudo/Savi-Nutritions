@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Stock Alerts - Resource Management{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Resource Management</span> <i class="fas fa-chevron-right"></i> <span>Stock Alerts</span></div>
+    <h1 class="page-title">Critical Stock Alerts</h1>
+    <p style="color:var(--text-light);margin-top:5px;">All Raw Materials, Medicines and Chemicals at Critical stock level.</p>
+  </div>
+  <div class="export-actions"><button class="btn btn-secondary" onclick="exportTable('lowStockTable','critical_resources_export')"><i class="fas fa-download"></i> Export Report</button></div>
+</div>
+<div class="card">
+  <div class="card-header"><div class="card-title"><i class="fas fa-triangle-exclamation" style="color:#dc2626;margin-right:8px;"></i> Critical Resources</div><span class="badge badge-danger">{{ resources|length }} items</span></div>
+  <div class="table-container">
+    <table class="data-table" id="lowStockTable">
+      <thead><tr><th>ID</th><th>Item</th><th>Category</th><th>Stock Indicator</th><th>Closing Stock</th><th>Minimum Stock</th><th>Last Update</th></tr></thead>
+      <tbody>
+      {% for item in resources %}
+      <tr><td><strong>{{ loop.index }}</strong></td><td><strong>{{ item.name }}</strong><div style="font-size:11px;color:var(--text-light);margin-top:3px;">Unit: {{ item.unit }}</div></td><td>{{ item.group }}</td><td><span class="badge {% if item.status == 'Critical' %}badge-danger{% else %}badge-warning{% endif %}">{{ item.status }}</span></td><td><strong>{{ item.closing }}</strong></td><td>{{ item.min_stock }}</td><td>{{ item.last_update }}</td></tr>
+      {% else %}
+      <tr><td colspan="7"><div class="empty-state"><i class="fas fa-circle-check"></i><h3>No low stock items</h3><p>All resources are currently above their minimum stock level.</p></div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

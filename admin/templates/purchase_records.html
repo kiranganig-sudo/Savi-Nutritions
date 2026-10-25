@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Purchase Maintenance{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Purchase Maintenance</span></div>
+        <h1 class="page-title">Purchase Records</h1>
+        <div class="page-subtitle">Track supplier purchases, quantities, payments and outstanding amounts. Read-only — purchases are managed by the user side.</div>
+    </div>
+    <div class="export-actions" style="display:flex;gap:8px;align-items:center;">
+        <button class="btn btn-secondary" type="button" onclick="exportTable('purchaseRecordsTable','purchase_records_export')"><i class="fas fa-download"></i> Export</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Purchase Records</div>
+        <div class="filter-bar">
+            <div class="filter-input"><i class="fas fa-search"></i><input type="text" placeholder="Search purchase records..." oninput="searchTable(this,'purchaseRecordsTable')" aria-label="Search purchase records"></div>
+            <div class="filter-input"><i class="fas fa-filter"></i><select onchange="filterPurchaseStatus(this.value)" aria-label="Filter purchase status"><option value="all">All Status</option><option value="Paid">Paid</option><option value="Partial">Partial</option><option value="Unpaid">Unpaid</option></select></div>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="purchaseRecordsTable">
+            <thead><tr><th>Sl.No</th><th>Invoice Number</th><th>Name</th><th>Product</th><th>Quantity</th><th>Amount Paid (₹)</th><th>Remaining (₹)</th><th>Mode of Payment</th><th>Status</th><th>Credit Due</th></tr></thead>
+            <tbody>
+            {% for purchase in purchases %}
+                {% set c_alert = credit_alert(purchase) %}
+                <tr data-status="{{ purchase.status }}" {% if c_alert %}style="{% if c_alert.overdue %}background:#fbecec;{% else %}background:#fff4dc;{% endif %}"{% endif %}>
+                    <td>{{ loop.index }}</td><td>{{ purchase.invoice_number or '—' }}</td><td><strong>{{ purchase.vendor_name }}</strong></td><td>{{ purchase.product }}</td><td>{{ purchase.contain_quantity or purchase.quantity or '—' }}</td>
+                    <td>{{ purchase.amount_paid }}</td><td>{{ purchase.remaining }}</td><td>{{ purchase.payment_mode }}</td>
+                    <td>{% if purchase.status == 'Paid' %}<span class="badge badge-success">{{ purchase.status }}</span>{% elif purchase.status == 'Partial' %}<span class="badge badge-warning">{{ purchase.status }}</span>{% else %}<span class="badge badge-danger">{{ purchase.status }}</span>{% endif %}</td>
+                    <td>{% if c_alert %}{% if c_alert.overdue %}<span class="badge badge-danger">Overdue {{ -c_alert.days_left }}d</span>{% elif c_alert.days_left == 0 %}<span class="badge badge-danger">Due today</span>{% else %}<span class="badge badge-warning">Due in {{ c_alert.days_left }}d</span>{% endif %}<div style="font-size:11px;color:#66756c;margin-top:2px;">{{ c_alert.due_date }}</div>{% elif purchase.credit_due_date %}{{ purchase.credit_due_date }}{% else %}—{% endif %}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="10"><div class="empty-state"><i class="fas fa-file-invoice"></i><h3>No purchase records found</h3><p>No records match the selected filter.</p></div></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="pagination" style="padding:16px 20px;"><div class="pagination-info">Showing {{ purchases|length }} purchase records</div></div>
+</div>
+
+<script>
+function filterPurchaseStatus(status) {
+    document.querySelectorAll('#purchaseRecordsTable tbody tr[data-status]').forEach(row => { row.style.display = (status === 'all' || row.dataset.status === status) ? '' : 'none'; });
+}
+</script>
+{% endblock %}

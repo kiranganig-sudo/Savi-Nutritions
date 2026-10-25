@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}Scales Men Live Tracking{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Scales Men Live Tracking</span></div>
+        <h1 class="page-title">Scales Men Live Tracking</h1>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;">
+        <div class="auto-refresh">
+            <span>Auto Refresh</span>
+            <div class="toggle-switch active" onclick="toggleSwitch(this);if(this.classList.contains('active')){startAutoRefresh();}else{stopAutoRefresh();}"></div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="location.reload()"><i class="fas fa-sync-alt"></i> Refresh Now</button>
+    </div>
+</div>
+
+<div class="grid-5" style="margin-bottom:24px;">
+    <div class="stat-card">
+        <div class="stat-card-icon green"><i class="fas fa-users"></i></div>
+        <div class="stat-card-value">{{ total }}</div>
+        <div class="stat-card-label">Total Scales Men</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-icon blue"><i class="fas fa-user-check"></i></div>
+        <div class="stat-card-value">{{ on_duty }}</div>
+        <div class="stat-card-label">On Duty</div>
+        <div class="stat-card-change up"><i class="fas fa-circle" style="font-size:6px;"></i> Active now</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-icon orange"><i class="fas fa-truck"></i></div>
+        <div class="stat-card-value">{{ in_transit }}</div>
+        <div class="stat-card-label">In Transit</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-icon purple"><i class="fas fa-location-dot"></i></div>
+        <div class="stat-card-value">{{ at_customer }}</div>
+        <div class="stat-card-label">At Customer</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-icon red"><i class="fas fa-user-slash"></i></div>
+        <div class="stat-card-value">{{ offline }}</div>
+        <div class="stat-card-label">Offline</div>
+    </div>
+</div>
+
+<div class="grid-2" style="margin-bottom:24px;">
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title"><i class="fas fa-map-marked-alt" style="color:var(--primary);margin-right:8px;"></i> Location Overview</div>
+            <span class="badge badge-secondary">Preview</span>
+        </div>
+        <div class="card-body" style="padding:0;">
+            <div class="map-placeholder">
+                <div class="map-grid" aria-label="Scales men location preview">
+                    <span class="map-label map-label-north">NORTH</span>
+                    <span class="map-label map-label-south">SOUTH</span>
+                    {% for sm in scalesmen %}
+                    <span class="map-marker {% if sm.status == 'Offline' %}offline{% endif %}"
+                          style="left:{{ (((sm.lng - 68) / 23) * 86 + 7)|round(1) }}%;top:{{ (((35 - sm.lat) / 24) * 82 + 7)|round(1) }}%;"
+                          title="{{ sm.name }} — {{ sm.location }}">{{ loop.index }}</span>
+                    {% endfor %}
+                </div>
+                <div style="text-align:center;z-index:1;">
+                    <i class="fas fa-map-marked-alt" style="font-size:48px;margin-bottom:16px;opacity:0.5;"></i>
+                    <br>
+                    <span>Live map integration pending</span>
+                    <br>
+                    <small style="opacity:0.7;font-weight:400;font-size:12px;">Showing {{ total }} tracked scales men</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Scales Men List</div>
+            <div class="filter-input">
+                <i class="fas fa-search"></i>
+                <input type="text" placeholder="Search..." oninput="searchTable(this.closest('.filter-input').querySelector('input'),'scalesmenList')">
+            </div>
+        </div>
+        <div class="card-body" style="padding:0;max-height:420px;overflow-y:auto;" id="scalesmenList">
+            {% for sm in scalesmen %}
+            <div class="tracking-card" style="margin:0;border-radius:0;border-left:none;border-right:none;border-top:none;">
+                <div class="tracking-avatar">{{ sm.name[0] }}{{ sm.name.split()[1][0] if sm.name.split()|length > 1 else '' }}</div>
+                <div class="tracking-info">
+                    <div class="tracking-name">{{ sm.name }}</div>
+                    <div class="tracking-location"><i class="fas fa-map-pin" style="font-size:10px;margin-right:4px;"></i>{{ sm.location }} &middot; {{ sm.last_active }}</div>
+                </div>
+                <span class="tracking-status badge
+                    {% if sm.status == 'On Duty' %}badge-success
+                    {% elif sm.status == 'In Transit' %}badge-info
+                    {% elif sm.status == 'At Customer' %}badge-primary
+                    {% else %}badge-secondary{% endif %}">
+                    {{ sm.status }}
+                </span>
+                <div class="tracking-actions">
+                    <a class="action-btn" title="Call {{ sm.name }}" href="tel:{{ sm.phone|replace(' ', '') }}"><i class="fas fa-phone" style="font-size:12px;color:var(--primary);"></i></a>
+                    <button class="action-btn" type="button" title="Track {{ sm.name }}" onclick="alert('Live location tracking will be connected during backend integration.')"><i class="fas fa-location-arrow" style="font-size:12px;color:#1976d2;"></i></button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Recent Activities</div>
+    </div>
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Scales Man</th>
+                    <th>Activity</th>
+                    <th>Location</th>
+                    <th>Time</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Ramesh Yadav</strong></td>
+                    <td>Order #ORD-2026-003 picked up from warehouse</td>
+                    <td>Delhi Central</td>
+                    <td>2 min ago</td>
+                    <td><span class="badge badge-success"><i class="fas fa-check-circle"></i> Completed</span></td>
+                </tr>
+                <tr>
+                    <td><strong>Suresh Pillai</strong></td>
+                    <td>In transit to Mumbai Western customer</td>
+                    <td>Mumbai Western</td>
+                    <td>5 min ago</td>
+                    <td><span class="badge badge-info"><i class="fas fa-truck"></i> In Progress</span></td>
+                </tr>
+                <tr>
+                    <td><strong>Ajay Singh</strong></td>
+                    <td>Delivered order #ORD-2026-009 to customer</td>
+                    <td>Bangalore South</td>
+                    <td>1 min ago</td>
+                    <td><span class="badge badge-success"><i class="fas fa-check-circle"></i> Completed</span></td>
+                </tr>
+                <tr>
+                    <td><strong>Deepak Verma</strong></td>
+                    <td>Started shift - 6 orders assigned</td>
+                    <td>Chennai East</td>
+                    <td>8 min ago</td>
+                    <td><span class="badge badge-primary"><i class="fas fa-play"></i> Started</span></td>
+                </tr>
+                <tr>
+                    <td><strong>Rajesh Gupta</strong></td>
+                    <td>Picked up order #ORD-2026-008</td>
+                    <td>Pune Central</td>
+                    <td>3 min ago</td>
+                    <td><span class="badge badge-info"><i class="fas fa-truck"></i> In Transit</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>document.addEventListener('DOMContentLoaded', function () { startAutoRefresh(); });</script>
+{% endblock %}

@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Remarks{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Remarks</span></div>
+        <h1 class="page-title">Remarks</h1>
+        <div class="page-subtitle">Payment remarks entered by the user portal against raw material and product sales. View-only.</div>
+    </div>
+    <div class="export-actions" style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" type="button" onclick="exportTable(rmkVisibleTable(),'remarks_export')"><i class="fas fa-download"></i> Export</button>
+    </div>
+</div>
+
+<div style="display:flex;gap:8px;margin-bottom:14px;">
+    <button class="btn btn-primary" id="tabRmBtn" type="button" onclick="switchTab('raw_material')">Raw Material Sales</button>
+    <button class="btn btn-secondary" id="tabPsBtn" type="button" onclick="switchTab('product')">Product Sales</button>
+</div>
+
+<div class="card" id="rmCard">
+    <div class="card-header">
+        <div class="card-title">Raw Material Sales Remarks</div>
+        <div class="filter-bar">
+            <div class="filter-input"><i class="fas fa-search"></i><input type="text" placeholder="Search remarks..." oninput="searchTable(this,'rmRemarksTable')" aria-label="Search raw material remarks"></div>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="rmRemarksTable">
+            <thead><tr><th>Sl.No</th><th>Invoice Number</th><th>Customer Name</th><th>Product</th><th>Total Amount (₹)</th><th>Amount Received (₹)</th><th>Balance (₹)</th><th>Date</th><th>Mode of Payment</th><th>Notes</th></tr></thead>
+            <tbody>
+            {% for r in remarks if r.sale_type == 'raw_material' %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ r.invoice_number or '—' }}</td>
+                    <td><strong>{{ r.customer_name or '—' }}</strong></td>
+                    <td>{{ r.product or '—' }}</td>
+                    <td>{{ r.total_amount }}</td>
+                    <td>{{ r.amount_received }}</td>
+                    <td>{{ r.balance }}</td>
+                    <td><strong>{{ r.date or '—' }}</strong></td>
+                    <td>{{ r.payment_mode or '—' }}</td>
+                    <td style="white-space:pre-wrap;max-width:240px;">{{ r.notes or '—' }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="10"><div class="empty-state"><i class="fas fa-comment-dots"></i><h3>No raw material remarks yet</h3><p>Remarks saved on the user portal appear here.</p></div></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card" id="psCard" style="display:none;">
+    <div class="card-header">
+        <div class="card-title">Product Sales Remarks</div>
+        <div class="filter-bar">
+            <div class="filter-input"><i class="fas fa-search"></i><input type="text" placeholder="Search remarks..." oninput="searchTable(this,'psRemarksTable')" aria-label="Search product remarks"></div>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="psRemarksTable">
+            <thead><tr><th>Sl.No</th><th>Invoice Number</th><th>Customer Name</th><th>Product</th><th>Amount to be Paid (₹)</th><th>Amount Received (₹)</th><th>Balance (₹)</th><th>Date</th><th>Mode of Payment</th><th>Notes</th></tr></thead>
+            <tbody>
+            {% for r in remarks if r.sale_type == 'product' %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ r.invoice_number or '—' }}</td>
+                    <td><strong>{{ r.customer_name or '—' }}</strong></td>
+                    <td>{{ r.product or '—' }}</td>
+                    <td>{{ r.total_amount }}</td>
+                    <td>{{ r.amount_received }}</td>
+                    <td>{{ r.balance }}</td>
+                    <td><strong>{{ r.date or '—' }}</strong></td>
+                    <td>{{ r.payment_mode or '—' }}</td>
+                    <td style="white-space:pre-wrap;max-width:240px;">{{ r.notes or '—' }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="10"><div class="empty-state"><i class="fas fa-comment-dots"></i><h3>No product remarks yet</h3><p>Remarks saved on the user portal appear here.</p></div></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+function rmkVisibleTable(){ return document.getElementById('rmCard').style.display === 'none' ? 'psRemarksTable' : 'rmRemarksTable'; }
+function switchTab(t){
+  document.getElementById('rmCard').style.display = t === 'raw_material' ? '' : 'none';
+  document.getElementById('psCard').style.display = t === 'product' ? '' : 'none';
+  document.getElementById('tabRmBtn').className = 'btn ' + (t === 'raw_material' ? 'btn-primary' : 'btn-secondary');
+  document.getElementById('tabPsBtn').className = 'btn ' + (t === 'product' ? 'btn-primary' : 'btn-secondary');
+}
+switchTab('raw_material');
+</script>
+{% endblock %}

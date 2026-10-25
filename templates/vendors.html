@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% block title %}Vendors Management{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Vendors Management</span></div>
+        <h1 class="page-title">Vendors List</h1>
+        <div class="page-subtitle">Create and manage vendors with purchase, payment and outstanding details.</div>
+    </div>
+    <div class="export-actions" style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" type="button" onclick="exportTable('vendorsTable','vendors_export')"><i class="fas fa-download"></i> Export</button>
+        <button class="btn btn-primary" type="button" onclick="openVendorModal()"><i class="fas fa-plus"></i> Add Vendor</button>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Vendors <span class="badge badge-primary">{{ vendors|length }}</span></div>
+        <div class="filter-bar">
+            <div class="filter-input"><i class="fas fa-search"></i><input type="text" placeholder="Search vendors..." oninput="searchTable(this,'vendorsTable')" aria-label="Search vendors"></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;" role="group" aria-label="Filter by category">
+            <a class="btn btn-sm {% if category_filter == 'all' %}btn-primary{% else %}btn-secondary{% endif %}" href="{{ url_for('vendors') }}">All Vendors</a>
+            <a class="btn btn-sm {% if category_filter == 'Raw Materials' %}btn-primary{% else %}btn-secondary{% endif %}" href="{{ url_for('vendors', category='Raw Materials') }}">Raw Materials</a>
+            <a class="btn btn-sm {% if category_filter == 'Medicines' %}btn-primary{% else %}btn-secondary{% endif %}" href="{{ url_for('vendors', category='Medicines') }}">Medicines</a>
+        <a class="btn btn-sm {% if category_filter == 'Chemicals' %}btn-primary{% else %}btn-secondary{% endif %}" href="{{ url_for('vendors', category='Chemicals') }}">Chemicals</a>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="vendorsTable">
+            <thead><tr><th>Sl.No</th><th>Name</th><th>Phone Number</th><th>Address</th><th>GSTIN Number</th><th>Products</th><th>Category</th><th>Actions</th></tr></thead>
+            <tbody>
+            {% for v in vendors %}
+                <tr data-status="{{ v.status }}">
+                    <td>{{ loop.index }}</td><td><strong>{{ v.vendor_name }}</strong></td><td>{{ v.vendor_phone or '—' }}</td><td style="white-space:pre-line">{{ v.address }}</td><td>{{ v.gstin or '—' }}</td>
+                    <td>{% set vgroups = vendor_product_groups(v) %}{% for g in vgroups %}<div style="margin-bottom:2px;">{% if g.group != 'Products' %}<span style="font-size:10.5px;color:#8a988f;">{{ g.group }}:</span>{% endif %} {{ g.products | join(', ') }}</div>{% else %}{{ v.product or '—' }}{% endfor %}</td>
+                    <td><span class="badge {% if v.category == 'Raw Materials' %}badge-info{% elif v.category == 'Medicines' %}badge-success{% elif v.category == 'Chemicals' %}badge-danger{% else %}badge-primary{% endif %}">{{ v.category }}</span></td>
+                    <td><div class="row-actions"><button class="action-btn" type="button" title="Edit" style="color:#166534;" onclick="editVendor({{ v.id }})"><i class="fas fa-pencil-alt"></i></button><button class="action-btn" type="button" title="Delete" style="color:#d32f2f;" onclick="deleteVendor({{ v.id }}, '{{ v.vendor_name }}')"><i class="fas fa-trash"></i></button></div></td>
+                </tr>
+            {% else %}
+                <tr><td colspan="8"><div class="empty-state"><i class="fas fa-users"></i><h3>No vendors found</h3><p>Add your first vendor to get started.</p></div></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="pagination" style="padding:16px 20px;"><div class="pagination-info">Showing {{ vendors|length }} vendors</div></div>
+</div>
+
+<div class="modal-overlay" id="vendorModal" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.45);align-items:center;justify-content:center;z-index:100;padding:20px;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:720px;padding:22px;max-height:88vh;overflow-y:auto;">
+    <h3 id="venModalTitle" style="margin:0 0 4px;">Add Vendor</h3>
+    <p id="venModalSub" style="font-size:12px;color:#66756c;margin:0 0 16px;">Add vendor master details. Saved vendors will appear automatically in Purchase Maintenance.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group"><label class="form-label">Vendor Name *</label><input class="form-control" id="venName" placeholder="Enter vendor name" data-con="name"></div>
+      <div class="form-group"><label class="form-label">GSTIN Number (15 characters, A–Z &amp; 0–9) — optional</label><input class="form-control" id="venGstin" placeholder="e.g. 29ABCDE1234F1Z5" maxlength="15" style="text-transform:uppercase;"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group"><label class="form-label">Vendor Contact Number (10 digits, 0–9) - optional</label><input class="form-control" id="venPhone" type="tel" inputmode="numeric" placeholder="Enter 10-digit contact number" maxlength="10" oninput="sanitizeVenPhone()"></div>
+      <div class="form-group"><label class="form-label">Category *</label><select class="form-control" id="venCategory" required onchange="onVenCategoryChange()"><option>Raw Materials</option><option>Medicines</option><option>Chemicals</option><option>All Materials</option></select></div>
+    </div>
+    <div class="form-group"><label class="form-label">Address</label><input class="form-control" id="venAddress" placeholder="Full address"></div>
+    <div class="form-group">
+      <label class="form-label">Products <span style="font-weight:400;color:#8a988f;">(select one or more)</span></label>
+      <div id="venProductsPanel">
+        {% set vgroups = ['Raw Materials', 'Chemicals', 'Medicines'] %}
+        {% for g in vgroups %}
+        <div class="ven-prod-group" data-group="{{ g }}" style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;{% if loop.index > 1 %}display:none;{% endif %}">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <strong style="font-size:12.5px;">{{ g }}</strong>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="toggleVenGroup(this,'{{ g }}')">Select all</button>
+          </div>
+          <div class="ven-prod-list" style="max-height:170px;overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;">
+            {% for p in product_options.get(g, []) %}
+            <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="ven-prod" name="venProd" value="{{ p }}" data-group="{{ g }}" onchange="updateVenProductsHint()"> {{ p }}</label>
+            {% endfor %}
+          </div>
+          <div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="toggleVenNewProduct(this)"><i class="fas fa-plus"></i> Add New Product</button>
+            <div class="ven-new-product" data-group="{{ g }}" style="display:none;margin-top:6px;">
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input class="form-control" type="text" placeholder="New product name" style="flex:1;font-size:12.5px;">
+                <button type="button" class="btn btn-sm btn-primary" onclick="addVenNewProduct(this)">Add</button>
+                <button type="button" class="btn btn-sm btn-secondary" onclick="closeVenNewProduct(this)">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <div style="font-size:11px;color:#8a988f;margin-top:2px;" id="venProductsHint">Select the products this vendor can supply.</div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+      <button class="btn btn-secondary" onclick="closeModal('vendorModal')">Cancel</button>
+      <button class="btn btn-primary" id="venSaveBtn" onclick="saveVendor()">Save Vendor</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const VENDOR_DATA = {{ vendors | tojson }};
+function openVendorModal(){
+  document.getElementById('venModalTitle').textContent = 'Add Vendor';
+  document.getElementById('venModalSub').textContent = 'Add vendor master details. Saved vendors will appear automatically in Purchase Maintenance.';
+  document.getElementById('venName').value = '';
+  document.getElementById('venGstin').value = '';
+  document.getElementById('venPhone').value = '';
+  document.getElementById('venAddress').value = '';
+  document.getElementById('venCategory').value = 'Raw Materials';
+  document.querySelectorAll('.ven-prod').forEach(cb => cb.checked = false);
+  delete document.getElementById('venSaveBtn').dataset.id;
+  document.getElementById('venSaveBtn').textContent = 'Save Vendor';
+  onVenCategoryChange();
+  document.getElementById('vendorModal').style.display='flex';
+}
+function editVendor(id){
+  const v = VENDOR_DATA.find(x => Number(x.id) === Number(id));
+  if(!v){ alert('Vendor data not found.'); return; }
+  document.getElementById('venModalTitle').textContent = 'Edit Vendor';
+  document.getElementById('venModalSub').textContent = 'Edit vendor master details and save your changes.';
+  document.getElementById('venName').value = v.vendor_name || '';
+  document.getElementById('venGstin').value = v.gstin || '';
+  document.getElementById('venPhone').value = v.vendor_phone || '';
+  document.getElementById('venAddress').value = v.address || '';
+  const catOpts = ['Raw Materials', 'Medicines', 'Chemicals', 'All Materials'];
+  document.getElementById('venCategory').value = catOpts.includes(v.category) ? v.category : 'Raw Materials';
+  let prods = {};
+  if(v.products){
+    try {
+      const parsed = JSON.parse(v.products);
+      if(Array.isArray(parsed)){ prods[document.getElementById('venCategory').value] = parsed.slice(); }
+      else if(parsed && typeof parsed === 'object'){ prods = parsed; }
+    } catch(e){}
+  }
+  if(!Object.keys(prods).length && v.product){
+    prods[document.getElementById('venCategory').value] = [String(v.product).split(',')[0].trim()];
+  }
+  document.querySelectorAll('.ven-prod').forEach(cb => { cb.checked = false; });
+  for(const g in prods){
+    (prods[g] || []).forEach(p => {
+      ensureVenProductChecked(g, p);
+    });
+  }
+  document.getElementById('venSaveBtn').dataset.id = String(v.id);
+  document.getElementById('venSaveBtn').textContent = 'Update Vendor';
+  onVenCategoryChange();
+  document.getElementById('vendorModal').style.display='flex';
+}
+function ensureVenProductChecked(group, p){
+  const key = String(group);
+  const name = String(p).trim();
+  if(!name) return;
+  let cb = Array.from(document.querySelectorAll('.ven-prod[data-group="' + key + '"]')).find(c => c.value === name);
+  if(cb){ cb.checked = true; return; }
+  const list = document.querySelector('.ven-prod-group[data-group="' + key + '"] .ven-prod-list');
+  if(!list) return;
+  const label = document.createElement('label');
+  label.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;';
+  cb = document.createElement('input');
+  cb.type = 'checkbox'; cb.className = 'ven-prod'; cb.name = 'venProd'; cb.value = name; cb.dataset.group = key; cb.checked = true;
+  cb.onchange = updateVenProductsHint;
+  label.appendChild(cb);
+  label.appendChild(document.createTextNode(' ' + name));
+  list.appendChild(label);
+}
+function onVenCategoryChange(){
+  const cat = document.getElementById('venCategory').value;
+  document.querySelectorAll('.ven-prod-group').forEach(el => {
+    el.style.display = (cat === 'All Materials' || el.dataset.group === cat) ? '' : 'none';
+  });
+  updateVenProductsHint();
+}
+function toggleVenGroup(btn, g){
+  const boxes = document.querySelectorAll('.ven-prod[data-group="'+g+'"]');
+  const allOn = Array.from(boxes).every(b => b.checked);
+  boxes.forEach(b => b.checked = !allOn);
+  updateVenProductsHint();
+}
+function getVenProducts(){
+  const map = {};
+  document.querySelectorAll('.ven-prod:checked').forEach(b => {
+    (map[b.dataset.group] = map[b.dataset.group] || []).push(b.value);
+  });
+  return map;
+}
+function updateVenProductsHint(){
+  const n = document.querySelectorAll('.ven-prod:checked').length;
+  document.getElementById('venProductsHint').textContent = n ? (n + ' product(s) selected.') : 'Select the products this vendor can supply.';
+}
+function toggleVenNew(sel){
+  document.getElementById('venNewWrap').style.display = sel.value === '__new' ? '' : 'none';
+}
+function fmtDisplayDate(iso){
+  if(!iso) return '';
+  const d = new Date(iso + 'T00:00:00');
+  if(isNaN(d)) return '';
+  return d.toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'});
+}
+function sanitizeVenPhone(){
+  const el = document.getElementById('venPhone');
+  el.value = el.value.replace(/\D/g, '').slice(0, 10);
+}
+async function saveVendor(){
+  sanitizeVenPhone();
+  const body = {
+    vendor_name: document.getElementById('venName').value.trim(),
+    vendor_phone: document.getElementById('venPhone').value,
+    gstin: document.getElementById('venGstin').value.trim().toUpperCase(),
+    address: document.getElementById('venAddress').value.trim(),
+    products: getVenProducts(),
+    category: document.getElementById('venCategory').value
+  };
+  if(!body.vendor_name){ alert('Vendor name is required.'); return; }
+  // Contact number is optional (Change #51) - only format-checked when typed.
+  if(body.vendor_phone && !/^[0-9]{10}$/.test(body.vendor_phone)){ alert('Vendor contact number must be exactly 10 digits (0–9).'); return; }
+  if(!body.category){ alert('Vendor category is required.'); return; }
+  // GSTIN is optional (item 6) - only format-checked when the admin types one.
+  if(body.gstin && !/^[A-Z0-9]{15}$/.test(body.gstin)){ alert('GSTIN must be exactly 15 letters/numbers (A–Z, 0–9).'); return; }
+  const btn = document.getElementById('venSaveBtn');
+  const id = btn.dataset.id;
+  btn.disabled = true;
+  try {
+    const res = await fetch(id ? '/api/vendors/' + id : '/api/vendors', {method: id ? 'PUT' : 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    const data = await res.json();
+    if(!res.ok || !data.success) throw new Error(data.error || 'Unable to save');
+    location.reload();
+  } catch(err){ btn.disabled = false; alert(err.message); }
+}
+function toggleVenNewProduct(btn){
+  const row = btn.parentElement.querySelector('.ven-new-product');
+  const showing = row.style.display === 'flex';
+  document.querySelectorAll('.ven-new-product').forEach(r => r.style.display = 'none');
+  if(!showing){
+    row.style.display = 'flex';
+    row.querySelector('input').focus();
+  }
+}
+function closeVenNewProduct(btn){
+  btn.closest('.ven-new-product').style.display = 'none';
+}
+async function addVenNewProduct(btn){
+  const row = btn.closest('.ven-new-product');
+  const group = row.dataset.group;
+  const inp = row.querySelector('input');
+  const name = inp.value.trim();
+  if(!name){ alert('Enter the new product name.'); return; }
+  const exists = Array.from(document.querySelectorAll('.ven-prod[data-group="'+group+'"]')).some(cb => cb.value.toLowerCase() === name.toLowerCase());
+  if(exists){ alert('"' + name + '" already exists under ' + group + '.'); return; }
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/resources', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({group: group, name: name})});
+    const data = await res.json();
+    if(!res.ok || !data.success) throw new Error(data.error || 'Unable to add product');
+    const list = document.querySelector('.ven-prod-group[data-group="'+group+'"] .ven-prod-list');
+    const label = document.createElement('label');
+    label.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.className = 'ven-prod'; cb.name = 'venProd'; cb.value = name; cb.dataset.group = group; cb.checked = true;
+    cb.onchange = updateVenProductsHint;
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(' ' + name));
+    if(list) list.appendChild(label);
+    inp.value = '';
+    row.style.display = 'none';
+    updateVenProductsHint();
+  } catch(err){ alert(err.message); }
+  finally { btn.disabled = false; }
+}
+async function deleteVendor(id, name){
+  if(!confirm('Delete vendor "' + name + '"?')) return;
+  const res = await fetch('/api/vendors/' + id, {method:'DELETE'});
+  const data = await res.json();
+  if(!res.ok || !data.success){ alert(data.error || 'Unable to delete'); return; }
+  location.reload();
+}
+</script>
+{% endblock %}

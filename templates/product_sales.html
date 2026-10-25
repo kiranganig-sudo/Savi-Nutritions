@@ -1,0 +1,488 @@
+{% extends "base.html" %}
+{% block title %}Product Sales{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Product Sales</span></div>
+        <h1 class="page-title">Product Sales</h1>
+        <div class="page-subtitle">Sell finished goods from stock. The sold quantity is deducted from the product's stock.</div>
+    </div>
+    <div class="export-actions" style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" type="button" onclick="exportTable('psSalesTable','product_sales_export')"><i class="fas fa-download"></i> Export</button>
+        <button class="btn btn-primary" type="button" onclick="openPsModal()"><i class="fas fa-plus"></i> Add Sales</button>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Sale Records</div>
+        <div class="filter-bar">
+            <div class="filter-input"><i class="fas fa-search"></i><input type="text" placeholder="Search sales..." oninput="searchTable(this,'psSalesTable')" aria-label="Search product sales"></div>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="psSalesTable">
+            <thead><tr><th>Sl.No</th><th>Invoice Number</th><th>Customer Name</th><th>Customer Contact Number</th><th>Salesman</th><th>Product</th><th>Quantity</th><th>Total Amount (₹)</th><th>Globle Discount</th><th>Amount to be paid (₹)</th><th>Amount Received (₹)</th><th>Balance Amount (₹)</th><th>Location</th><th style="width:60px;">Action</th></tr></thead>
+            <tbody>
+            {% for sale in sales %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ sale.invoice_number or '—' }}</td>
+                    <td><strong>{{ sale.customer or '—' }}</strong></td>
+                    <td>{{ sale.customer_contact or '—' }}</td>
+                    <td>{{ sale.salesman_name or '—' }}</td>
+                    <td>{{ sale.product }}</td>
+                    <td>{{ sale.quantity }}</td>
+                    <td>{{ sale.total_amount_value }}</td>
+                    <td>{{ sale.discount_display or '—' }}</td>
+                    <td>{{ sale.amount_to_pay }}</td>
+                    <td>{{ sale.amount }}</td>
+                    <td>{{ sale.balance_amount }}</td>
+                    <td>{{ sale.location or '—' }}</td>
+                    <td><div class="row-actions"><button class="action-btn" type="button" title="Edit sale" style="color:#1f6fb2;" onclick="editPsSale('{{ sale.id }}')"><i class="fas fa-pen"></i></button><button class="action-btn" type="button" title="Delete sale" style="color:#d32f2f;" onclick="deletePsSale('{{ sale.id }}')"><i class="fas fa-trash"></i></button></div></td>
+                </tr>
+            {% else %}
+                <tr><td colspan="14"><div class="empty-state"><i class="fas fa-cart-shopping"></i><h3>No product sales yet</h3><p>Use "Add Sales" to record a sale — the quantity is deducted from the product's stock.</p></div></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="pagination" style="padding:16px 20px;"><div class="pagination-info">Showing {{ sales|length }} sale record(s)</div></div>
+</div>
+
+<div class="modal-overlay" id="psModal" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.45);align-items:center;justify-content:center;z-index:100;padding:20px;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:560px;padding:22px;max-height:90vh;overflow-y:auto;">
+    <h3 style="margin:0 0 4px;" id="psModalTitle">Add Product Sale</h3>
+    <p style="font-size:12px;color:#66756c;margin:0 0 16px;">The sold quantity is subtracted from the product's stock.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group"><label class="form-label">Invoice Number</label>
+        <input class="form-control" id="psInvNo" maxlength="60" placeholder="e.g. INV-1024" autocomplete="off" data-con="invoice">
+      </div>
+      <div class="form-group"><label class="form-label">Location</label>
+        <input class="form-control" id="psLocation" maxlength="120" placeholder="e.g. Bengaluru Warehouse" autocomplete="off">
+      </div>
+      <!-- Change #56: pick a product -> it is added below WITH its own qty box. -->
+      <div class="form-group" style="grid-column:1 / -1;"><label class="form-label">Product *</label>
+        <select class="form-control" id="psProduct" onchange="psAddSelected()">
+          <option value="" selected>Select product</option>
+          {% for p in products %}
+          <option value="{{ p.name }}" data-stock="{{ p.stock }}" data-price="{{ p.price }}">{{ p.name }}</option>
+          {% endfor %}
+        </select>
+        <div style="font-size:11px;color:#8a988f;margin-top:4px;" id="psStockHint">Current stock shows after selecting a product.</div>
+      </div>
+      <div class="form-group" style="grid-column:1 / -1;"><label class="form-label">Selected Products &amp; Quantity per Product (bags) *</label>
+        <div id="psSelectedList" style="border:1px solid #e2e8e4;border-radius:8px;padding:8px;background:#fafcfb;"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Total Bags</label>
+        <input class="form-control" id="psQty" type="number" min="0" step="1" readonly placeholder="Auto">
+      </div>
+      <div class="form-group"><label class="form-label">Customer Name</label>
+        <input class="form-control" id="psCustomer" maxlength="120" placeholder="e.g. Savi Traders" autocomplete="off" data-con="name">
+      </div>
+      <div class="form-group"><label class="form-label">Customer Contact Number</label>
+        <input class="form-control" id="psContact" maxlength="10" inputmode="numeric" pattern="[0-9]{10}" title="Exactly 10 digits (0-9)" placeholder="10 digits, 0-9" autocomplete="off" data-con="phone">
+      </div>
+      <!-- Change #59: Salesman Name - typed manually, optional. -->
+      <div class="form-group"><label class="form-label">Salesman Name</label>
+        <input class="form-control" id="psSalesman" maxlength="120" placeholder="e.g. Ravi" autocomplete="off" data-con="name">
+      </div>
+      <!-- Change #60: the typed box was "Amount to be paid" - renamed Total
+           Amount. Globle Discount (amount OR percentage) is subtracted from it
+           to fill the new read-only Amount to be paid box below. -->
+      <div class="form-group"><label class="form-label">Total Amount (₹)</label>
+        <input class="form-control" id="psTotal" type="number" min="0" step="any" placeholder="e.g. 10000" oninput="psDiscountCalc()">
+      </div>
+      <div class="form-group"><label class="form-label">Globle Discount</label>
+        <div style="display:flex;gap:6px;">
+          <input class="form-control" id="psDiscAmt" type="number" min="0" step="any" placeholder="Amount ₹" oninput="psDiscountCalc(true)">
+          <input class="form-control" id="psDiscPct" type="number" min="0" max="100" step="any" placeholder="% percent" oninput="psDiscountCalc(false)">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Amount to be paid (₹)</label>
+        <input class="form-control" id="psPayable" type="number" readonly placeholder="Auto">
+      </div>
+      <div class="form-group"><label class="form-label">Amount Received (₹)</label>
+        <input class="form-control" id="psAmount" type="number" min="0" step="any" placeholder="Auto from price" oninput="psBalanceCalc()">
+      </div>
+      <div class="form-group"><label class="form-label">Balance Amount (₹)</label>
+        <input class="form-control" id="psBalance" type="number" min="0" step="any" placeholder="e.g. 5000">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+      <button class="btn btn-secondary" onclick="closeModal('psModal')">Cancel</button>
+      <button class="btn btn-primary" id="psSaveBtn" onclick="savePsSale()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Change #54 (edit button): every row's data + edit-mode state. Built
+// field-by-field so attachment names stay out of the page - the edit form
+// only needs these values. Change #56 adds `location` + the `items` JSON.
+const PS_ROWS = [{% for s in sales %}{"id": {{ s.id }},
+  "date": {{ s.date|tojson }},
+  "product": {{ s.product|tojson }},
+  "quantity": {{ s.quantity }},
+  "amount": {{ s.amount }},
+  "customer": {{ s.customer|tojson }},
+  "invoice_number": {{ s.invoice_number|tojson }},
+  "customer_contact": {{ s.customer_contact|tojson }},
+  "salesman_name": {{ s.salesman_name|tojson }},
+  "balance_amount": {{ s.balance_amount }},
+  "location": {{ s.location|tojson }},
+  "items": {{ s['items']|tojson }},
+  "total_amount": {% if s.total_amount is not none %}{{ s.total_amount }}{% else %}null{% endif %},
+  "discount_amount": {% if s.discount_amount is not none %}{{ s.discount_amount }}{% else %}null{% endif %},
+  "discount_percent": {% if s.discount_percent is not none %}{{ s.discount_percent }}{% else %}null{% endif %}}{% if not loop.last %},{% endif %}{% endfor %}];
+// Change #56: stock/price lookup for the client-side stock cap + fallback.
+const PS_STOCK = {}; const PS_PRICE = {};
+{% for p in products %}PS_STOCK[{{ p.name|tojson }}] = {{ p.stock or 0 }}; PS_PRICE[{{ p.name|tojson }}] = {{ p.price or 0 }};{% endfor %}
+let editingSale = null;
+// Change #56: the products picked for THIS sale. Each one gets its own
+// quantity box below - there is NO qty box until its product is selected.
+let psSelected = [];
+
+function psEsc(value){
+  return String(value === null || value === undefined ? '' : value)
+    .replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+}
+function psItemsOf(row){
+  // Stored JSON item list; empty/NULL = legacy single-product row.
+  // Change #59: each entry may carry the optional per-product `price`.
+  if (row.items){
+    try {
+      const parsed = JSON.parse(row.items);
+      if (Array.isArray(parsed) && parsed.length){
+        return parsed.map(function(e){ return {product: e.product, qty: e.qty, price: e.price}; });
+      }
+    } catch (e) {}
+  }
+  return [{product: row.product, qty: row.quantity, price: null}];
+}
+function psStockOf(name){
+  const value = PS_STOCK[name];
+  return value === undefined ? 0 : (Number(value) || 0);
+}
+function psStockHint(){
+  const sel = document.getElementById('psProduct');
+  const opt = sel.options[sel.selectedIndex];
+  const hint = document.getElementById('psStockHint');
+  if (opt && opt.value){ hint.textContent = 'Current stock: ' + opt.dataset.stock + ' bags | Price: ₹' + opt.dataset.price + '/bag'; }
+  else { hint.textContent = 'Current stock shows after selecting a product.'; }
+}
+function psRenderSelected(){
+  const box = document.getElementById('psSelectedList');
+  if (!psSelected.length){
+    box.innerHTML = '<div style="font-size:11px;color:#8a988f;">No product selected yet. Pick a product above - its quantity box appears here.</div>';
+  } else {
+    box.innerHTML = psSelected.map(function(it, i){
+      const priceVal = (it.price === '' || it.price === null || it.price === undefined) ? '' : it.price;
+      return '<div class="ps-sel-row" style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">'
+        + '<span style="flex:1;font-size:12px;font-weight:600;color:#15599c;">' + psEsc(it.product) + '</span>'
+        + '<input class="form-control ps-item-qty" type="number" min="1" step="1" style="width:110px;" '
+        + 'data-i="' + i + '" value="' + psEsc(it.qty === '' ? '' : it.qty) + '" placeholder="Bags" '
+        + 'onkeydown="return psQtyKey(event)" oninput="psItemQty(this)">'
+        + '<input class="form-control ps-item-price" type="number" min="0" step="any" style="width:100px;" '
+        + 'data-i="' + i + '" value="' + psEsc(priceVal) + '" placeholder="Price" '
+        + 'oninput="psItemPrice(this)">'
+        + '<button type="button" class="action-btn" title="Remove product" style="color:#d32f2f;" '
+        + 'onclick="psRemoveItem(' + i + ')"><i class="fas fa-times"></i></button>'
+        + '</div>';
+    }).join('');
+  }
+  psTotalBags();
+}
+function psQtyKey(e){
+  if (e.key === 'e' || e.key === 'E' || e.key === '+' || e.key === '-' || e.key === '.' || e.key === ','){
+    e.preventDefault();
+    return false;
+  }
+  return true;
+}
+function psItemQty(el){
+  const i = Number(el.dataset.i);
+  if (!psSelected[i]){ return; }
+  el.value = el.value.replace(/[^0-9]/g, '');
+  psSelected[i].qty = el.value === '' ? '' : Number(el.value);
+  psTotalBags();
+}
+// Change #59: the optional per-product Price box (decimals allowed).
+function psItemPrice(el){
+  const i = Number(el.dataset.i);
+  if (!psSelected[i]){ return; }
+  el.value = el.value.replace(/[^0-9.]/g, '');
+  psSelected[i].price = el.value === '' ? '' : Number(el.value);
+  // Change #60: the fallback Total (empty Total Amount box) uses qty x price.
+  psDiscountCalc();
+}
+function psTotalBags(){
+  let total = 0;
+  psSelected.forEach(function(it){
+    const n = Number(it.qty);
+    if (it.qty !== '' && isFinite(n)){ total += n; }
+  });
+  document.getElementById('psQty').value = String(total);
+  // Change #60: when the Total Amount box is empty the payable falls back to
+  // qty x price - any qty/price edit must recompute it.
+  psDiscountCalc();
+}
+function psAddSelected(){
+  const sel = document.getElementById('psProduct');
+  const name = sel.value;
+  if (!name){ psStockHint(); return; }
+  if (psSelected.some(function(it){ return it.product === name; })){
+    psStockHint();
+    return;
+  }
+  const stock = Number(sel.options[sel.selectedIndex].dataset.stock || 0);
+  psSelected.push({product: name, qty: '', price: ''});
+  psRenderSelected();
+  document.getElementById('psStockHint').textContent =
+    'Added ' + name + ' (current stock: ' + stock + ' bags). Pick another product to add more.';
+  sel.value = '';
+}
+function psRemoveItem(i){
+  psSelected.splice(i, 1);
+  psRenderSelected();
+  psStockHint();
+}
+// Change #52 (2026-10-07): the money box was typed manually (no more
+// quantity x price auto-fill - psAmountHint() was removed with it). Change
+// #60: the typed box is Total Amount; once BOTH the payable and received
+// amounts exist, Balance = payable - received.
+function psBalanceCalc(){
+  const paid = document.getElementById('psPayable').value;
+  const recv = document.getElementById('psAmount').value;
+  if (paid === '' || recv === '') return;
+  document.getElementById('psBalance').value = String(Number(paid) - Number(recv));
+}
+// Change #60: Globle Discount = an amount OR a percentage (typing in one
+// clears the other). Amount to be paid = Total Amount - discount; the
+// effective Total falls back to qty x price when the box is left empty
+// (same fallback the server uses). `fromAmount` is undefined when the Total
+// box itself changed - then neither discount box is cleared.
+function psDiscountState(){
+  const amtEl = document.getElementById('psDiscAmt');
+  const pctEl = document.getElementById('psDiscPct');
+  const typed = document.getElementById('psTotal').value;
+  let total = 0;
+  if (typed !== ''){
+    total = Number(typed) || 0;
+  } else {
+    psSelected.forEach(function(it){
+      total += Number(it.qty || 0) * (Number(PS_PRICE[it.product]) || 0);
+    });
+  }
+  let rawDisc = 0;
+  if (amtEl.value !== ''){
+    rawDisc = Math.max(Number(amtEl.value) || 0, 0);
+  } else if (pctEl.value !== ''){
+    let pct = Number(pctEl.value) || 0;
+    if (pct > 100) pct = 100;
+    rawDisc = total * pct / 100;
+  }
+  return {total: total, typed: typed, rawDisc: rawDisc,
+          disc: (rawDisc > total ? total : rawDisc)};
+}
+function psDiscountCalc(fromAmount){
+  const amtEl = document.getElementById('psDiscAmt');
+  const pctEl = document.getElementById('psDiscPct');
+  if (fromAmount === true){ pctEl.value = ''; }
+  if (fromAmount === false){ amtEl.value = ''; }
+  const st = psDiscountState();
+  document.getElementById('psPayable').value =
+    (st.total > 0 || st.typed !== '') ? String(Math.round((st.total - st.disc) * 100) / 100) : '';
+  psBalanceCalc();
+}
+function openPsModal(){
+  editingSale = null;
+  psSelected = [];
+  document.getElementById('psModalTitle').textContent = 'Add Product Sale';
+  document.getElementById('psInvNo').value = '';
+  document.getElementById('psProduct').value = '';
+  document.getElementById('psLocation').value = '';
+  document.getElementById('psCustomer').value = '';
+  document.getElementById('psContact').value = '';
+  document.getElementById('psSalesman').value = '';
+  document.getElementById('psAmount').value = '';
+  document.getElementById('psBalance').value = '';
+  document.getElementById('psTotal').value = '';
+  document.getElementById('psDiscAmt').value = '';
+  document.getElementById('psDiscPct').value = '';
+  document.getElementById('psPayable').value = '';
+  psRenderSelected();
+  psStockHint();
+  document.getElementById('psModal').style.display = 'flex';
+}
+// Change #54 (edit button): prefill the modal from the row and save via PUT.
+// Change #56: the selected products (each with its qty box) are rebuilt from
+// the row's `items` JSON. The date is NOT re-sent, so a sale keeps the date
+// it was recorded on; the stock cap becomes closing + the row's own quantity
+// for products that stay unchanged.
+function editPsSale(id){
+  const p = PS_ROWS.find(x => String(x.id) === String(id));
+  if (!p){ return; }
+  editingSale = p.id;
+  document.getElementById('psModalTitle').textContent = 'Edit Product Sale';
+  document.getElementById('psInvNo').value = p.invoice_number || '';
+  document.getElementById('psLocation').value = p.location || '';
+  document.getElementById('psCustomer').value = p.customer || '';
+  document.getElementById('psContact').value = p.customer_contact || '';
+  document.getElementById('psSalesman').value = p.salesman_name || '';
+  document.getElementById('psAmount').value = String(p.amount || '');
+  document.getElementById('psBalance').value = String(p.balance_amount || 0);
+  document.getElementById('psProduct').value = '';
+  psSelected = psItemsOf(p).map(function(it){
+    return {product: it.product, qty: it.qty,
+            price: (it.price === null || it.price === undefined) ? '' : it.price};
+  });
+  psRenderSelected();
+  // Amount to be paid: stored value wins; a NULL (never typed) falls back to
+  // qty x price summed over the sale's products.
+  let totalVal = (p.total_amount !== null && p.total_amount !== undefined) ? p.total_amount : '';
+  if (totalVal === ''){
+    let sum = 0;
+    psItemsOf(p).forEach(function(it){
+      sum += Number(it.qty || 0) * (Number(PS_PRICE[it.product]) || 0);
+    });
+    totalVal = String(sum);
+  }
+  document.getElementById('psTotal').value = String(totalVal);
+  // Change #60: prefill the Globle Discount exactly as stored (amount wins,
+  // percentage only when no amount) and recompute the read-only payable.
+  // The stored Balance is restored afterwards: psDiscountCalc() runs the
+  // balance auto-calc, which must not overwrite the row's own value here.
+  document.getElementById('psDiscAmt').value =
+    (p.discount_amount !== null && p.discount_amount !== undefined) ? p.discount_amount : '';
+  document.getElementById('psDiscPct').value =
+    (p.discount_percent !== null && p.discount_percent !== undefined) ? p.discount_percent : '';
+  const storedBalance = document.getElementById('psBalance').value;
+  psDiscountCalc();
+  document.getElementById('psBalance').value = storedBalance;
+  psStockHint();
+  document.getElementById('psModal').style.display = 'flex';
+}
+async function savePsSale(){
+  const editing = editingSale !== null;
+  const d = new Date();
+  const iso = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  const date = iso.split('-').reverse().join('-');
+  if (!psSelected.length){ alert('Product is required'); return; }
+  // On edit the current stock already excludes this row's old quantities.
+  const oldRow = editing ? PS_ROWS.find(x => String(x.id) === String(editingSale)) : null;
+  const oldMap = {};
+  if (oldRow){
+    psItemsOf(oldRow).forEach(function(it){
+      oldMap[it.product] = (oldMap[it.product] || 0) + Number(it.qty || 0);
+    });
+  }
+  const items = [];
+  let totalBags = 0;
+  for (let i = 0; i < psSelected.length; i++){
+    const it = psSelected[i];
+    if (it.qty === '' || it.qty === null || it.qty === undefined){
+      alert('Quantity is required for ' + it.product);
+      return;
+    }
+    const qty = Number(it.qty);
+    if (!Number.isInteger(qty) || qty <= 0){
+      alert('Quantity must be a whole number more than 0');
+      return;
+    }
+    const allowed = psStockOf(it.product) + (oldMap[it.product] || 0);
+    if (qty > allowed){
+      alert('Only ' + allowed + ' bags available in stock for ' + it.product);
+      return;
+    }
+    // Change #59: optional per-product Price box.
+    let priceVal = null;
+    if (it.price !== '' && it.price !== null && it.price !== undefined){
+      const pn = Number(it.price);
+      if (!isFinite(pn) || pn < 0){
+        alert('Price must be a non-negative number for ' + it.product);
+        return;
+      }
+      priceVal = pn;
+    }
+    items.push({product: it.product, qty: qty, price: priceVal});
+    totalBags += qty;
+  }
+  const contact = document.getElementById('psContact').value.trim();
+  if (contact && !/^[0-9]{10}$/.test(contact)){ alert('Customer contact number must be exactly 10 digits'); return; }
+  const amountRaw = document.getElementById('psAmount').value;
+  if (amountRaw && Number(amountRaw) < 0){ alert('Amount Received cannot be negative'); return; }
+  const paidRaw = document.getElementById('psTotal').value;
+  if (paidRaw && Number(paidRaw) < 0){ alert('Total amount cannot be negative'); return; }
+  // Change #60: Globle Discount - amount OR percentage (0..100), optional.
+  const discAmtRaw = document.getElementById('psDiscAmt').value;
+  const discPctRaw = document.getElementById('psDiscPct').value;
+  if (discAmtRaw && (Number(discAmtRaw) < 0)){ alert('Globle discount amount cannot be negative'); return; }
+  if (discPctRaw && (Number(discPctRaw) < 0 || Number(discPctRaw) > 100)){
+    alert('Globle discount percentage must be between 0 and 100'); return;
+  }
+  const discSt = psDiscountState();
+  if (discSt.rawDisc > discSt.total){
+    alert('Globle discount cannot be more than the Total Amount'); return;
+  }
+  const balRaw = document.getElementById('psBalance').value;
+  if (balRaw && Number(balRaw) < 0){ alert('Balance Amount cannot be negative'); return; }
+  const saleLocation = document.getElementById('psLocation').value.trim();
+  const form = new FormData();
+  if (!editing){ form.append('date', date); }
+  form.append('items', JSON.stringify(items));
+  form.append('product', items.map(function(x){ return x.product; }).join(', '));
+  form.append('quantity', String(totalBags));
+  form.append('location', saleLocation);
+  if (amountRaw) form.append('amount', amountRaw);
+  form.append('customer', document.getElementById('psCustomer').value.trim());
+  form.append('customer_contact', contact);
+  form.append('salesman_name', document.getElementById('psSalesman').value.trim());
+  form.append('invoice_number', document.getElementById('psInvNo').value.trim());
+  if (paidRaw) form.append('total_amount', paidRaw);
+  // Change #60: ALWAYS send both discount keys - a blank value clears the
+  // stored discount on edit (the PUT only overwrites when a key is present).
+  form.append('discount_amount', discAmtRaw);
+  form.append('discount_percent', discPctRaw);
+  if (balRaw) form.append('balance_amount', balRaw);
+  const saveBtn = document.getElementById('psSaveBtn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving...';
+  try {
+    let res;
+    try {
+      res = await fetch(editing ? '/api/product-sales/' + editingSale : '/api/product-sales',
+                        {method: editing ? 'PUT' : 'POST', body: form});
+    } catch (e) {
+      alert('Could not reach the server. Check your connection and try again.');
+      return;
+    }
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (e) {
+      alert('Server error (HTTP ' + res.status + '). Please try again.');
+      return;
+    }
+    if(!res.ok || !data.success){ alert(data.error || 'Unable to save'); return; }
+    location.reload();
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save';
+  }
+}
+async function deletePsSale(id){
+  if (!confirm('Delete this sale? The quantity will be added back to stock.')) return;
+  try {
+    const res = await fetch('/api/product-sales/' + id, {method:'DELETE'});
+    let data = null;
+    try { data = await res.json(); } catch (e) {}
+    if (!res.ok || (data && data.success === false)){ alert((data && data.error) || 'Unable to delete'); return; }
+    location.reload();
+  } catch (e) {
+    alert('Could not reach the server. Check your connection and try again.');
+  }
+}
+</script>
+{% endblock %}

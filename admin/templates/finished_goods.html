@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}{{ inventory_title }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>{{ inventory_title }}</span></div>
+        <h1 class="page-title">{{ inventory_title }}</h1>
+        <div class="page-subtitle">View stock levels, pricing and availability.</div>
+    </div>
+    <div class="export-actions">
+        <button class="btn btn-secondary" onclick="exportTable('finishedGoodsTable','{{ inventory_title|lower|replace(' ', '_') }}_export')"><i class="fas fa-download"></i> Export</button>
+        <button class="btn btn-primary" type="button" onclick="openProductModal()"><i class="fas fa-plus"></i> Add Item</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="filter-input">
+            <i class="fas fa-search"></i>
+            <input type="text" placeholder="Search items..." oninput="searchTable(this, 'finishedGoodsTable')">
+        </div>
+        <span class="badge badge-primary">{{ products|length }} items</span>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="finishedGoodsTable">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Category</th>
+                    <th>Price</th>
+                    <th>Stock</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for product in products %}
+                <tr>
+                    <td>
+                        {% if product.image %}<img src="{{ url_for('product_image', filename=product.image) }}" alt="{{ product.name }}" style="width:42px;height:42px;object-fit:contain;vertical-align:middle;margin-right:8px;">{% else %}<img src="{{ url_for('static', filename='img/logo.png') }}" alt="{{ product.name }}" style="width:42px;height:42px;object-fit:contain;vertical-align:middle;margin-right:8px;">{% endif %}
+                        <strong>{{ product.name }}</strong>
+                    </td>
+                    <td>{{ product.category }}</td>
+                    <td><strong>₹{{ product.price }}</strong></td>
+                    <td>{{ product.stock }}</td>
+                    <td>
+                        {% if product.status == 'In Stock' %}
+                        <span class="badge badge-success"><i class="fas fa-check-circle"></i> {{ product.status }}</span>
+                        {% elif product.status == 'Critical' %}
+                        <span class="badge badge-danger"><i class="fas fa-times-circle"></i> {{ product.status }}</span>
+                        {% else %}
+                        <span class="badge badge-warning"><i class="fas fa-exclamation-circle"></i> {{ product.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="row-actions">
+                        <a class="action-btn" title="View details" href="{{ url_for('inventory_product', product_name=product.name) }}"><i class="fas fa-eye"></i></a>
+                        <button class="action-btn" type="button" title="Delete" style="color:#d32f2f;" onclick="deleteProduct({{ product.id }}, '{{ product.name }}')"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="pagination" style="padding:16px 20px;">
+        <div class="pagination-info">Showing {{ products|length }} items</div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="productModal" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.45);align-items:center;justify-content:center;z-index:100;padding:20px;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:520px;padding:22px;">
+    <h3 style="margin:0 0 4px;">Add Item</h3>
+    <p style="font-size:12px;color:#66756c;margin:0 0 16px;">Saved to SQLite with automatic stock status.</p>
+    <div class="form-group"><label class="form-label">Product name *</label><input class="form-control" id="prodName" placeholder="e.g. Savi Gold Plus"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group"><label class="form-label">Price (₹)</label><input class="form-control" id="prodPrice" type="number" value="1500" min="0"></div>
+      <div class="form-group"><label class="form-label">Stock</label><input class="form-control" id="prodStock" type="number" value="50" min="0"></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+      <button class="btn btn-secondary" onclick="closeModal('productModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveProduct()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="editProductModal" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.45);align-items:center;justify-content:center;z-index:100;padding:20px;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:520px;padding:22px;">
+    <h3 style="margin:0 0 4px;">Edit Item</h3>
+    <p style="font-size:12px;color:#66756c;margin:0 0 16px;">Correct a mistaken entry — stock status updates automatically.</p>
+    <div class="form-group"><label class="form-label">Product name *</label><input class="form-control" id="editProdName" placeholder="e.g. Savi Gold Plus"></div>
+    <div class="form-group"><label class="form-label">Category</label><input class="form-control" id="editProdCategory" placeholder="Finished Goods"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group"><label class="form-label">Price (₹)</label><input class="form-control" id="editProdPrice" type="number" min="0"></div>
+      <div class="form-group"><label class="form-label">Stock</label><input class="form-control" id="editProdStock" type="number" min="0"></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+      <button class="btn btn-secondary" onclick="closeModal('editProductModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditProduct()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function openProductModal(){ document.getElementById('productModal').style.display='flex'; }
+async function saveProduct(){
+  const body = {
+    name: document.getElementById('prodName').value.trim(),
+    category: "{{ inventory_title }}",
+    price: parseInt(document.getElementById('prodPrice').value || '0'),
+    stock: parseInt(document.getElementById('prodStock').value || '0')
+  };
+  if(!body.name){ alert('Product name is required'); return; }
+  const res = await fetch('/api/products', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  const data = await res.json();
+  if(!res.ok || !data.success){ alert(data.error || 'Unable to save'); return; }
+  location.reload();
+}
+async function deleteProduct(id, name){
+  if(!confirm('Delete "' + name + '" and its raw materials?')) return;
+  const res = await fetch('/api/products/' + id, {method:'DELETE'});
+  const data = await res.json();
+  if(!res.ok || !data.success){ alert(data.error || 'Unable to delete'); return; }
+  location.reload();
+}
+let editProductId = null;
+function openEditProduct(id, name, category, price, stock){
+  editProductId = id;
+  document.getElementById('editProdName').value = name;
+  document.getElementById('editProdCategory').value = category;
+  document.getElementById('editProdPrice').value = price;
+  document.getElementById('editProdStock').value = stock;
+  document.getElementById('editProductModal').style.display='flex';
+}
+async function saveEditProduct(){
+  const body = {
+    name: document.getElementById('editProdName').value.trim(),
+    category: document.getElementById('editProdCategory').value.trim() || 'Finished Goods',
+    price: parseInt(document.getElementById('editProdPrice').value || '0'),
+    stock: parseInt(document.getElementById('editProdStock').value || '0')
+  };
+  if(!body.name){ alert('Product name is required'); return; }
+  const res = await fetch('/api/products/' + editProductId, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  const data = await res.json();
+  if(!res.ok || !data.success){ alert(data.error || 'Unable to update'); return; }
+  location.reload();
+}
+</script>
+{% endblock %}

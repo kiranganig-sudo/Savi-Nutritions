@@ -1,0 +1,632 @@
+{% extends "base.html" %}
+{% block title %}Purchase Maintenance{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Purchase Maintenance</span></div>
+        <h1 class="page-title">Purchase Records</h1>
+        <div class="page-subtitle">Track supplier purchases, quantities, payments and outstanding amounts.</div>
+    </div>
+    <div class="export-actions" style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" type="button" onclick="exportTable('purchaseRecordsTable','purchase_records_export')"><i class="fas fa-download"></i> Export</button>
+        <button class="btn btn-primary" type="button" onclick="openPurchaseModal()"><i class="fas fa-plus"></i> Add Purchase</button>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Purchase Records</div>
+        <div class="filter-bar">
+            <div class="filter-input"><i class="fas fa-search"></i><input type="text" placeholder="Search purchase records..." oninput="searchTable(this,'purchaseRecordsTable')" aria-label="Search purchase records"></div>
+            <div class="filter-input"><i class="fas fa-filter"></i><select onchange="filterPurchaseStatus(this.value)" aria-label="Filter purchase status"><option value="all">All Status</option><option value="Paid">Paid</option><option value="Partial">Partial</option><option value="Unpaid">Unpaid</option></select></div>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="purchaseRecordsTable">
+            <thead><tr><th>Sl.No</th><th>Invoice Number</th><th>Name</th><th>Product</th><th>Quantity</th><th>Amount Paid (₹)</th><th>Remaining (₹)</th><th>Mode of Payment</th><th>Status</th><th>Credit Due</th><th style="width:60px;">Action</th></tr></thead>
+            <tbody>
+            {% for purchase in purchases %}
+                {% set c_alert = credit_alert(purchase) %}
+                <tr data-status="{{ purchase.status }}" {% if c_alert %}style="{% if c_alert.overdue %}background:#fbecec;{% else %}background:#fff4dc;{% endif %}"{% endif %}>
+                    <td>{{ loop.index }}</td><td>{{ purchase.invoice_number or '—' }}</td><td><strong>{{ purchase.vendor_name }}</strong></td><td>{{ purchase.product }}</td><td>{{ purchase.contain_quantity or purchase.quantity or '—' }}</td>
+                    <td>{{ purchase.amount_paid }}</td><td>{{ purchase.remaining }}</td><td>{{ purchase.payment_mode }}</td>
+                    <td>{% if purchase.status == 'Paid' %}<span class="badge badge-success">{{ purchase.status }}</span>{% elif purchase.status == 'Partial' %}<span class="badge badge-warning">{{ purchase.status }}</span>{% else %}<span class="badge badge-danger">{{ purchase.status }}</span>{% endif %}</td>
+                    <td>{% if c_alert %}{% if c_alert.overdue %}<span class="badge badge-danger">Overdue {{ -c_alert.days_left }}d</span>{% elif c_alert.days_left == 0 %}<span class="badge badge-danger">Due today</span>{% else %}<span class="badge badge-warning">Due in {{ c_alert.days_left }}d</span>{% endif %}<div style="font-size:11px;color:#66756c;margin-top:2px;">{{ c_alert.due_date }}</div>{% elif purchase.credit_due_date %}{{ purchase.credit_due_date }}{% else %}—{% endif %}</td>
+                    <td><div class="row-actions"><button class="action-btn" type="button" title="Edit purchase" style="color:#1f6fb2;" onclick='editPurchase({{ purchase.id }})'><i class="fas fa-pen"></i></button><button class="action-btn" type="button" title="Delete purchase" style="color:#d32f2f;" onclick='deletePurchase({{ purchase.id }}, {{ (purchase.vendor_name or "")|tojson }})'><i class="fas fa-trash"></i></button></div></td>
+                </tr>
+            {% else %}
+                <tr><td colspan="11"><div class="empty-state"><i class="fas fa-file-invoice"></i><h3>No purchase records found</h3><p>No records match the selected filter.</p></div></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="pagination" style="padding:16px 20px;"><div class="pagination-info">Showing {{ purchases|length }} purchase records</div></div>
+</div>
+<div class="modal-overlay" id="purchaseModal" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.45);align-items:center;justify-content:center;z-index:100;padding:20px;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:720px;padding:22px;max-height:90vh;overflow-y:auto;">
+    <h3 style="margin:0 0 4px;" id="purModalTitle">Add Purchase</h3>
+    <p style="font-size:12px;color:#66756c;margin:0 0 16px;">Saved to SQLite — status auto-calculates from amounts.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group"><label class="form-label">Vendor Name *</label>
+        <select class="form-control" id="purVendor" onchange="fillVendorDetails()">
+          <option value="" selected disabled>Select vendor from list</option>
+          {% for vd in vendor_list %}
+          <option value="{{ vd.name }}">{{ vd.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Vendor phone number</label><input class="form-control" id="purPhone" placeholder="Auto-filled from vendor (type it if the vendor has no number)" inputmode="numeric" maxlength="10" pattern="[0-9]{10}" title="Exactly 10 digits (0-9)" data-con="phone" autocomplete="off"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group"><label class="form-label">Vendor GSTIN</label><input class="form-control" id="purGstin" placeholder="Auto-filled" readonly></div>
+      <div class="form-group"><label class="form-label">Vendor Address</label><input class="form-control" id="purAddress" placeholder="Auto-filled" readonly></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group"><label class="form-label">Category</label>
+        <select class="form-control" id="purCategory" onchange="loadPurProducts()">
+          <option value="" selected disabled>Select category</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Product</label>
+        <select class="form-control" id="purProduct" disabled>
+          <option value="" selected disabled>First select a vendor</option>
+        </select>
+        <div style="font-size:11px;color:#8a988f;margin-top:4px;">Shows only the products supplied by the selected vendor.</div>
+      </div>
+      <div class="form-group"><label class="form-label">Invoice Number *</label><input class="form-control" id="purInvNo" placeholder="e.g. INV-1024" maxlength="60" autocomplete="off" data-con="invoice" required></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group"><label class="form-label">Driver Name *</label><input class="form-control" id="purDriverName" placeholder="e.g. Ramesh" maxlength="120" autocomplete="off" data-con="name" required></div>
+      <div class="form-group"><label class="form-label">Driver Contact Number (10 digits, 0–9)</label><input class="form-control" id="purDriverPhone" placeholder="Enter 10-digit contact number" maxlength="10" inputmode="numeric" autocomplete="off" pattern="[0-9]{10}" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group"><label class="form-label">Vehicle Number *</label>
+        <input class="form-control" id="purVehicle" placeholder="e.g. KA-99-PU-8907" maxlength="15" autocomplete="off" required data-con="vehicle" oninput="formatVehicleNumber(this)">
+        <div style="font-size:11px;color:#8a988f;margin-top:4px;">Uppercase letters &amp; numbers only</div>
+      </div>
+      <div class="form-group"><label class="form-label">Date of Arrival *</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input class="form-control" id="purArrival" type="text" inputmode="numeric" placeholder="dd-mm-yyyy" maxlength="10" autocomplete="off" oninput="formatArrivalTyping(this)">
+          <input class="form-control" id="purArrivalPicker" type="date" aria-label="Pick date of arrival" style="flex:0 0 46px;width:46px;padding:6px 2px;" onchange="syncArrivalFromPicker()">
+        </div>
+        <div id="purArrivalHint" style="font-size:11px;color:#8a988f;margin-top:4px;">Pick from calendar or type dd-mm-yyyy</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group"><label class="form-label">Quantity in the Bill *</label>
+        <div style="display:flex;gap:8px;">
+          <input class="form-control" id="purBillQty" type="number" min="0" step="any" placeholder="e.g. 500" style="flex:1;" required>
+          <select class="form-control" id="purBillUnit" style="flex:0 0 110px;width:110px;"><option value="Kgs">Kgs</option><option value="Tons">Tons</option></select>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Actual Quantity *</label>
+        <div style="display:flex;gap:8px;">
+          <input class="form-control" id="purContainQty" type="number" min="0" step="any" placeholder="e.g. 500" style="flex:1;" required>
+          <select class="form-control" id="purContainUnit" style="flex:0 0 110px;width:110px;"><option value="Kgs">Kgs</option><option value="Tons">Tons</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Invoice Attachment (JPG / JPEG / PNG) *</label>
+      <input class="form-control" id="purSlip" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required>
+      <div style="font-size:11px;color:#8a988f;margin-top:4px;" id="purSlipHint">Max 4 MB. Photos are compressed automatically.</div>
+    </div>
+    <div class="form-group"><label class="form-label">Weigment Attachment (JPG / JPEG / PNG) *</label>
+      <input class="form-control" id="purWeigh" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required>
+      <div style="font-size:11px;color:#8a988f;margin-top:4px;" id="purWeighHint">Max 4 MB. Photos are compressed automatically.</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;">
+      <div class="form-group"><label class="form-label">Amount Paid (₹) *</label><input class="form-control" id="purPaid" type="number" min="0" required oninput="togglePurReturn()"></div>
+      <div class="form-group"><label class="form-label">Remaining (₹) *</label><input class="form-control" id="purRem" type="number" min="0" required oninput="togglePurReturn()"></div>
+      <div class="form-group"><label class="form-label">Mode</label><select class="form-control" id="purMode" onchange="togglePurReturn()"><option>Cash</option><option>UPI</option><option>Bank Transfer</option><option>Card</option></select></div>
+      <div class="form-group"><label class="form-label">Credit Period (Days)</label><input class="form-control" id="purCreditDays" type="number" value="0" min="0" placeholder="e.g. 15" oninput="syncPurReturnFromDays()"></div>
+    </div>
+    <div id="purReturnWrap" style="display:none;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group">
+        <label class="form-label">Last date to return</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input class="form-control" id="purReturnText" type="text" inputmode="numeric" placeholder="dd-mm-yyyy" maxlength="10" autocomplete="off" oninput="formatReturnTyping(this)">
+          <input class="form-control" id="purReturnPicker" type="date" aria-label="Pick last date to return" style="flex:0 0 46px;width:46px;padding:6px 2px;" onchange="syncReturnFromPicker()">
+        </div>
+        <div style="font-size:11px;color:#8a988f;margin-top:4px;">Pick from calendar or type dd-mm-yyyy. Credit period (days) fills automatically.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Return date (dd-mm-yyyy)</label>
+        <span class="form-control" id="purReturnBadge" style="background:#e8f3ec;color:#1f4d2e;font-weight:600;display:none;"></span>
+      </div>
+    </div>
+    <div style="font-size:11px;color:#8a988f;margin-top:-4px;margin-bottom:2px;">Credit due date auto-calculates from the date of arrival. A notification fires when the due date is within 2 days.</div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+      <button class="btn btn-secondary" onclick="closeModal('purchaseModal')">Cancel</button>
+      <button class="btn btn-primary" id="purSaveBtn" onclick="savePurchase()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function filterPurchaseStatus(status) {
+    document.querySelectorAll('#purchaseRecordsTable tbody tr[data-status]').forEach(row => { row.style.display = (status === 'all' || row.dataset.status === status) ? '' : 'none'; });
+}
+// Item 6 (2026-10-05): per-row delete - DELETE /api/purchases/<id> already
+// existed on the user portal but had no button anywhere.
+async function deletePurchase(id, label){
+  const who = (typeof label === 'string' && label) ? label : 'this vendor';
+  if(!confirm('Delete the purchase record for ' + who + '?\n\nThe quantity this purchase added to stock is taken back.')) return;
+  try {
+    const res = await fetch('/api/purchases/' + id, {method:'DELETE'});
+    let data = null;
+    try { data = await res.json(); } catch(e){}
+    if(!res.ok || (data && data.success === false)){
+      alert((data && data.error) || 'Unable to delete this purchase record.');
+      return;
+    }
+    location.reload();
+  } catch(e){
+    alert('Could not reach the server. Check your connection and try again.');
+  }
+}
+// Item 7 (2026-10-05): the calendar must refuse future days from first paint,
+// not only once openPurchaseModal() runs. Local date (never toISOString, which
+// is UTC and can be a day off).
+function todayIsoLocal(){
+  const n = new Date();
+  return n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0') + '-' + String(n.getDate()).padStart(2,'0');
+}
+(function(){
+  const picker = document.getElementById('purArrivalPicker');
+  if(picker){ picker.max = todayIsoLocal(); }
+})();
+function openPurchaseModal(){
+  const wasEditing = editingPurchase !== null;
+  editingPurchase = null;
+  document.getElementById('purModalTitle').textContent = 'Add Purchase';
+  setPurFileHints(false);
+  if (wasEditing){ resetPurchaseFields(); }
+  document.getElementById('purchaseModal').style.display='flex';
+  // Item 7 (2026-10-01): arrivals can never be in the future.
+  const maxToday = new Date();
+  const iso = maxToday.getFullYear() + '-' + String(maxToday.getMonth()+1).padStart(2,'0') + '-' + String(maxToday.getDate()).padStart(2,'0');
+  const picker = document.getElementById('purArrivalPicker');
+  picker.max = iso;
+  togglePurReturn();
+}
+// Change #54 (edit button): the file hints tell the user whether a fresh
+// attachment is mandatory (Add) or optional (Edit - leave empty to keep the
+// file already on the record).
+function setPurFileHints(editing){
+  const text = editing ? 'Leave empty to keep the current file (max 4 MB).'
+                       : 'Max 4 MB. Photos are compressed automatically.';
+  const a = document.getElementById('purSlipHint');
+  const b = document.getElementById('purWeighHint');
+  if (a) a.textContent = text;
+  if (b) b.textContent = text;
+}
+function resetPurchaseFields(){
+  ['purPhone','purGstin','purAddress','purInvNo','purDriverName','purDriverPhone',
+   'purVehicle','purArrival','purBillQty','purContainQty','purPaid','purRem',
+   'purReturnText'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  const vendor = document.getElementById('purVendor');
+  if (vendor) vendor.value = '';
+  currentVendorProducts = null;
+  const cat = document.getElementById('purCategory');
+  cat.innerHTML = '<option value="" selected disabled>Select category</option>';
+  const prod = document.getElementById('purProduct');
+  prod.innerHTML = '<option value="" selected disabled>First select a vendor</option>';
+  prod.disabled = true;
+  document.getElementById('purBillUnit').value = 'Kgs';
+  document.getElementById('purContainUnit').value = 'Kgs';
+  document.getElementById('purMode').value = 'Cash';
+  document.getElementById('purCreditDays').value = '0';
+  const rp = document.getElementById('purReturnPicker');
+  if (rp) rp.value = '';
+  const ap = document.getElementById('purArrivalPicker');
+  if (ap) ap.value = '';
+  updatePurReturnBadge('');
+  document.getElementById('purSlip').value = '';
+  document.getElementById('purWeigh').value = '';
+}
+// Change #54 (edit button): open the SAME modal in edit mode, prefilled from
+// the row's data (rendered into PUR_ROWS). Stock/attachments keep their
+// current values unless the user changes them - files are optional on edit.
+function editPurchase(id){
+  const p = PUR_ROWS.find(x => Number(x.id) === Number(id));
+  if (!p){ return; }
+  editingPurchase = p.id;
+  document.getElementById('purModalTitle').textContent = 'Edit Purchase';
+  const vendorSel = document.getElementById('purVendor');
+  vendorSel.value = '';
+  let opt = Array.from(vendorSel.options).find(o => o.value === p.vendor_name);
+  if (!opt && p.vendor_name){
+    opt = document.createElement('option');
+    opt.value = p.vendor_name; opt.textContent = p.vendor_name;
+    vendorSel.appendChild(opt);
+  }
+  if (opt){ vendorSel.value = p.vendor_name; }
+  fillVendorDetails();
+  // The purchase row's own values win over the vendor-master defaults.
+  document.getElementById('purPhone').value = p.vendor_phone || '';
+  document.getElementById('purAddress').value = p.address || '';
+  const cat = document.getElementById('purCategory');
+  const prodSel = document.getElementById('purProduct');
+  let group = null;
+  if (currentVendorProducts){
+    group = Object.keys(currentVendorProducts).find(g => (currentVendorProducts[g] || []).indexOf(p.product) !== -1) || null;
+  }
+  if (group){
+    cat.value = group;
+    loadPurProducts();
+  }
+  let popt = Array.from(prodSel.options).find(o => o.value === p.product);
+  if (!popt && p.product){
+    popt = document.createElement('option');
+    popt.value = p.product; popt.textContent = p.product;
+    prodSel.appendChild(popt);
+  }
+  if (popt){ prodSel.value = p.product; prodSel.disabled = false; }
+  document.getElementById('purInvNo').value = p.invoice_number || '';
+  document.getElementById('purDriverName').value = p.driver_name || '';
+  document.getElementById('purDriverPhone').value = p.driver_phone || '';
+  document.getElementById('purVehicle').value = p.vehicle_number || '';
+  document.getElementById('purArrival').value = p.arrival_date || '';
+  const arrPicker = document.getElementById('purArrivalPicker');
+  arrPicker.value = /^\d{2}-\d{2}-\d{4}$/.test(p.arrival_date || '')
+    ? p.arrival_date.split('-').reverse().join('-') : '';
+  document.getElementById('purBillQty').value = p.bill_quantity || '';
+  if (p.bill_unit){ document.getElementById('purBillUnit').value = p.bill_unit; }
+  document.getElementById('purContainQty').value = p.contain_quantity || '';
+  if (p.contain_unit){ document.getElementById('purContainUnit').value = p.contain_unit; }
+  // to_dict renders the amounts comma-grouped ("1,000") - strip for inputs.
+  document.getElementById('purPaid').value = String(p.amount_paid || 0).replace(/,/g, '');
+  document.getElementById('purRem').value = String(p.remaining || 0).replace(/,/g, '');
+  document.getElementById('purMode').value = p.payment_mode || 'Cash';
+  document.getElementById('purCreditDays').value = String(p.credit_days || 0);
+  document.getElementById('purReturnText').value = p.credit_due_date || '';
+  const retPicker = document.getElementById('purReturnPicker');
+  retPicker.value = /^\d{2}-\d{2}-\d{4}$/.test(p.credit_due_date || '')
+    ? p.credit_due_date.split('-').reverse().join('-') : '';
+  updatePurReturnBadge(p.credit_due_date || '');
+  document.getElementById('purSlip').value = '';
+  document.getElementById('purWeigh').value = '';
+  setPurFileHints(true);
+  const maxToday = new Date();
+  document.getElementById('purArrivalPicker').max = maxToday.getFullYear() + '-' +
+    String(maxToday.getMonth()+1).padStart(2,'0') + '-' + String(maxToday.getDate()).padStart(2,'0');
+  togglePurReturn();
+  document.getElementById('purchaseModal').style.display = 'flex';
+}
+function togglePurReturn(){
+  const rem = parseInt(document.getElementById('purRem').value || '0', 10);
+  const wrap = document.getElementById('purReturnWrap');
+  wrap.style.display = (rem > 0) ? 'grid' : 'none';
+  syncPurReturnFromDays();
+}
+const PUR_VENDOR_DATA = {{ vendor_data | tojson }};
+// Change #54 (edit button): every row's data for prefilling the edit form.
+const PUR_ROWS = {{ purchases | tojson }};
+let editingPurchase = null;
+let currentVendorProducts = null;
+function vendorProductsOf(v){
+  const byGroup = {};
+  let raw = (v && v.products) || '';
+  if (raw){
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)){
+        const g = (v.category && v.category !== 'All Materials') ? v.category : 'Products';
+        byGroup[g] = parsed.slice();
+      } else if (parsed && typeof parsed === 'object'){
+        Object.keys(parsed).forEach(g => { byGroup[g] = Array.isArray(parsed[g]) ? parsed[g].slice() : []; });
+      }
+    } catch(e){}
+  }
+  if (!Object.keys(byGroup).length && v && (v.product || '')){
+    const g = (v.category && ['Raw Materials','Medicines','Chemicals'].includes(v.category)) ? v.category : 'Products';
+    byGroup[g] = [String(v.product).split(',')[0].trim()];
+  }
+  return byGroup;
+}
+function fillVendorDetails(){
+  const v = PUR_VENDOR_DATA.find(x => x.vendor_name === document.getElementById('purVendor').value);
+  document.getElementById('purPhone').value = v ? (v.vendor_phone || '') : '';
+  document.getElementById('purGstin').value = v ? (v.gstin || '') : '';
+  document.getElementById('purAddress').value = v ? (v.address || '') : '';
+  currentVendorProducts = v ? vendorProductsOf(v) : null;
+  const cat = document.getElementById('purCategory');
+  cat.innerHTML = '<option value="" selected disabled>Select category</option>';
+  if (v){
+    const groups = Object.keys(currentVendorProducts || {}).filter(g => (currentVendorProducts[g] || []).length);
+if (groups.length === 1){
+      cat.innerHTML += '<option>' + groups[0] + '</option>';
+    } else {
+      groups.forEach(g => { cat.innerHTML += '<option>' + g + '</option>'; });
+    }
+    const firstOpt = cat.options[1] || cat.options[0];
+    if (firstOpt && firstOpt.value) cat.value = firstOpt.value;
+  }
+  loadPurProducts();
+}
+function loadPurProducts(){
+  const cat = document.getElementById('purCategory');
+  const sel = document.getElementById('purProduct');
+  sel.innerHTML = '';
+  if (!currentVendorProducts){
+    sel.innerHTML = '<option value="" selected disabled>First select a vendor</option>';
+    sel.disabled = true;
+    return;
+  }
+  if (!cat.value){
+    sel.innerHTML = '<option value="" selected disabled>First select the category</option>';
+    sel.disabled = true;
+    return;
+  }
+  const list = (currentVendorProducts[cat.value] || []).slice();
+  if (list.length){
+    list.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p; opt.textContent = p;
+      sel.appendChild(opt);
+    });
+    sel.disabled = false;
+  } else {
+    sel.innerHTML = '<option value="" selected disabled>No products for this category</option>';
+    sel.disabled = true;
+  }
+}
+function dateFromDdmmyyyy(value){
+  if(!/^\d{2}-\d{2}-\d{4}$/.test(value)) return null;
+  const [dd,mm,yyyy] = value.split('-').map(Number);
+  const dt = new Date(yyyy, mm-1, dd);
+  if (dt.getFullYear() !== yyyy || dt.getMonth() !== mm-1 || dt.getDate() !== dd) return null;
+  return dt;
+}
+function fmtDdmmyyyy(dt){
+  return String(dt.getDate()).padStart(2,'0') + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + dt.getFullYear();
+}
+function updatePurReturnBadge(value){
+  const badge = document.getElementById('purReturnBadge');
+  if (!badge) return;
+  if (value && /^\d{2}-\d{2}-\d{4}$/.test(value)){
+    badge.style.display = 'inline-block';
+    badge.textContent = 'Return by ' + value;
+  } else {
+    badge.style.display = 'none';
+  }
+}
+function syncPurReturnFromDays(){
+  const days = parseInt(document.getElementById('purCreditDays').value || '0', 10);
+  const arrival = document.getElementById('purArrival').value.trim();
+  const returnText = document.getElementById('purReturnText');
+  const arrDate = dateFromDdmmyyyy(arrival);
+  if (days > 0 && arrDate){
+    const dt = new Date(arrDate);
+    dt.setDate(dt.getDate() + days);
+    const text = fmtDdmmyyyy(dt);
+    returnText.value = text;
+    const picker = document.getElementById('purReturnPicker');
+    picker.value = text.split('-').reverse().join('-');
+    updatePurReturnBadge(text);
+  } else {
+    updatePurReturnBadge(returnText.value);
+  }
+}
+function syncPurDaysFromReturn(){
+  const returnText = document.getElementById('purReturnText').value.trim();
+  const arrival = document.getElementById('purArrival').value.trim();
+  const daysInp = document.getElementById('purCreditDays');
+  const retDate = dateFromDdmmyyyy(returnText);
+  const arrDate = dateFromDdmmyyyy(arrival);
+  if (retDate && arrDate){
+    const diff = Math.round((retDate - arrDate) / (1000*60*60*24));
+    daysInp.value = diff >= 0 ? String(diff) : '0';
+  }
+  updatePurReturnBadge(returnText);
+}
+function syncPurFromArrival(){
+  const returnText = document.getElementById('purReturnText').value.trim();
+  if (dateFromDdmmyyyy(returnText)){ syncPurDaysFromReturn(); }
+  else { syncPurReturnFromDays(); }
+}
+function formatReturnTyping(el){
+  const d = el.value.replace(/\D/g,'').slice(0,8);
+  let out = d.slice(0,2);
+  if (d.length > 2) out += '-' + d.slice(2,4);
+  if (d.length > 4) out += '-' + d.slice(4,8);
+  el.value = out;
+  const picker = document.getElementById('purReturnPicker');
+  if (d.length === 8){ picker.value = d.slice(4,8) + '-' + d.slice(2,4) + '-' + d.slice(0,2); }
+  else { picker.value = ''; }
+  syncPurDaysFromReturn();
+}
+function syncReturnFromPicker(){
+  const v = document.getElementById('purReturnPicker').value;
+  document.getElementById('purReturnText').value = v ? v.split('-').reverse().join('-') : '';
+  syncPurDaysFromReturn();
+}
+document.addEventListener('input', function(e){
+  if (!e.target) return;
+  if (e.target.id === 'purArrival'){ syncPurFromArrival(); }
+  if (e.target.id === 'purCreditDays'){ syncPurReturnFromDays(); }
+  if (e.target.id === 'purReturnText'){ syncPurDaysFromReturn(); }
+});
+function fillPurPhone(sel){
+  const opt = sel.options[sel.selectedIndex];
+  document.getElementById('purPhone').value = opt ? (opt.dataset.phone || '') : '';
+}
+function formatVehicleNumber(el){
+  const raw = el.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,10);
+  let out = raw;
+  if (raw.length > 2) out = raw.slice(0,2) + '-' + raw.slice(2);
+  if (raw.length > 4) out = raw.slice(0,2) + '-' + raw.slice(2,4) + '-' + raw.slice(4);
+  if (raw.length > 6) out = raw.slice(0,2) + '-' + raw.slice(2,4) + '-' + raw.slice(4,6) + '-' + raw.slice(6);
+  el.value = out;
+}
+function formatArrivalTyping(el){
+  const d = el.value.replace(/\D/g,'').slice(0,8);
+  let out = d.slice(0,2);
+  if (d.length > 2) out += '-' + d.slice(2,4);
+  if (d.length > 4) out += '-' + d.slice(4,8);
+  el.value = out;
+  const picker = document.getElementById('purArrivalPicker');
+  if (d.length === 8){ picker.value = d.slice(4,8) + '-' + d.slice(2,4) + '-' + d.slice(0,2); }
+  else { picker.value = ''; }
+  // Item 7 (2026-10-05): say it the moment a future date is typed instead of
+  // only at save time, and repeat the rule in the hint under the field.
+  const hint = document.getElementById('purArrivalHint');
+  if (hint){
+    const iso = picker.value;
+    const todayIso = todayIsoLocal();
+    if (iso && iso > todayIso){
+      hint.textContent = 'Date of Arrival cannot be in the future - pick today or an earlier date.';
+      hint.style.color = '#b3261e';
+      hint.style.fontWeight = '700';
+    } else {
+      hint.textContent = 'Pick from calendar or type dd-mm-yyyy';
+      hint.style.color = '#8a988f';
+      hint.style.fontWeight = '400';
+    }
+  }
+}
+function syncArrivalFromPicker(){
+  const v = document.getElementById('purArrivalPicker').value;
+  document.getElementById('purArrival').value = v ? v.split('-').reverse().join('-') : '';
+  syncPurFromArrival();
+}
+function isValidArrival(value){
+  if (!/^\d{2}-\d{2}-\d{4}$/.test(value)) return false;
+  const [dd,mm,yyyy] = value.split('-').map(Number);
+  if (mm < 1 || mm > 12) return false;
+  const dt = new Date(yyyy, mm - 1, dd);
+  return dt.getFullYear() === yyyy && dt.getMonth() === mm - 1 && dt.getDate() === dd;
+}
+const SLIP_MAX_BYTES = 4 * 1024 * 1024;
+function slipExtensionOk(name){
+  const n = String(name || '').toLowerCase();
+  return n.endsWith('.jpg') || n.endsWith('.jpeg') || n.endsWith('.png');
+}
+// Phone photos are often 3-8 MB, over the 4 MB upload limit; downscale +
+// JPEG-compress them before sending.
+function prepareSlipFile(file){
+  return new Promise(resolve => {
+    const isImage = /^image\//.test(file.type || '');
+    if (!isImage || file.size <= 400 * 1024){ resolve({blob: file, name: file.name}); return; }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = function(){
+      URL.revokeObjectURL(url);
+      const maxSide = 1600;
+      let w = img.naturalWidth, h = img.naturalHeight;
+      if (Math.max(w, h) > maxSide){
+        const k = maxSide / Math.max(w, h);
+        w = Math.round(w * k); h = Math.round(h * k);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      canvas.toBlob(function(blob){
+        if (blob && blob.size && blob.size < file.size){
+          resolve({blob: blob, name: file.name.replace(/\.[^.]+$/, '') + '.jpg'});
+        } else {
+          resolve({blob: file, name: file.name});
+        }
+      }, 'image/jpeg', 0.85);
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); resolve({blob: file, name: file.name}); };
+    img.src = url;
+  });
+}
+async function savePurchase(){
+  const vehicle = document.getElementById('purVehicle').value.trim();
+  if (!vehicle){ alert('Vehicle Number is required'); return; }
+  if (!(/[A-Z]/.test(vehicle) && /\d/.test(vehicle))){ alert('Vehicle number must contain both letters and numbers (e.g. KA-99-PU-8907)'); return; }
+  const arrival = document.getElementById('purArrival').value.trim();
+  if (!arrival){ alert('Date of Arrival is required'); return; }
+  if (!isValidArrival(arrival)){ alert('Date of arrival must be a valid dd-mm-yyyy date'); return; }
+  const arrDate = dateFromDdmmyyyy(arrival);
+  if (arrDate && arrDate.getTime() > new Date().setHours(0,0,0,0)){ alert('Date of Arrival cannot be in the future'); return; }
+  const drvName = document.getElementById('purDriverName').value.trim();
+  if (!drvName){ alert('Driver Name is required'); return; }
+  const drvPhone = document.getElementById('purDriverPhone').value.trim();
+  if (drvPhone && !/^[0-9]{10}$/.test(drvPhone)){ alert('Driver Contact Number must be exactly 10 digits'); return; }
+  if (!document.getElementById('purInvNo').value.trim()){ alert('Invoice Number is required'); return; }
+  if (!document.getElementById('purBillQty').value.trim()){ alert('Quantity in the Bill is required'); return; }
+  if (!document.getElementById('purContainQty').value.trim()){ alert('Actual Quantity is required'); return; }
+  const purPaidVal = document.getElementById('purPaid').value.trim();
+  const purRemVal = document.getElementById('purRem').value.trim();
+  if (purPaidVal === ''){ alert('Amount Paid is required'); return; }
+  if (purRemVal === ''){ alert('Remaining amount is required'); return; }
+  const slipInput = document.getElementById('purSlip');
+  let slipFile = null;
+  if (slipInput.files[0]){
+    const rawFile = slipInput.files[0];
+    if (!slipExtensionOk(rawFile.name)){ alert('Invoice attachment must be a JPG, JPEG or PNG image'); return; }
+    const prepared = await prepareSlipFile(rawFile);
+    if (prepared.blob.size > SLIP_MAX_BYTES){ alert('Invoice attachment is too large (max 4 MB)'); return; }
+    slipFile = new File([prepared.blob], prepared.name, {type: prepared.blob.type || rawFile.type || 'image/jpeg'});
+  } else if (editingPurchase === null){
+    alert('Invoice attachment is required'); return;
+  }
+  const weighInput = document.getElementById('purWeigh');
+  let weighFile = null;
+  if (weighInput.files[0]){
+    const rawWeigh = weighInput.files[0];
+    if (!slipExtensionOk(rawWeigh.name)){ alert('Weigment attachment must be a JPG, JPEG or PNG image'); return; }
+    const preparedWeigh = await prepareSlipFile(rawWeigh);
+    if (preparedWeigh.blob.size > SLIP_MAX_BYTES){ alert('Weigment attachment is too large (max 4 MB)'); return; }
+    weighFile = new File([preparedWeigh.blob], preparedWeigh.name, {type: preparedWeigh.blob.type || rawWeigh.type || 'image/jpeg'});
+  } else if (editingPurchase === null){
+    alert('Weigment attachment is required'); return;
+  }
+  const form = new FormData();
+  form.append('vendor_name', document.getElementById('purVendor').value.trim());
+  form.append('vendor_phone', document.getElementById('purPhone').value.trim());
+  form.append('address', document.getElementById('purAddress').value.trim());
+  form.append('product', document.getElementById('purProduct').value.trim());
+  form.append('invoice_number', document.getElementById('purInvNo').value.trim());
+  form.append('vehicle_number', vehicle);
+  form.append('arrival_date', arrival);
+  form.append('driver_name', document.getElementById('purDriverName').value.trim());
+  form.append('driver_phone', document.getElementById('purDriverPhone').value.trim());
+  form.append('bill_quantity', document.getElementById('purBillQty').value.trim());
+  form.append('bill_unit', document.getElementById('purBillUnit').value);
+  form.append('contain_quantity', document.getElementById('purContainQty').value.trim());
+  form.append('contain_unit', document.getElementById('purContainUnit').value);
+  form.append('amount_paid', purPaidVal);
+  form.append('remaining', purRemVal);
+  form.append('payment_mode', document.getElementById('purMode').value);
+  form.append('credit_days', document.getElementById('purCreditDays').value || '0');
+  const returnDate = document.getElementById('purReturnText').value.trim();
+  form.append('last_return_date', returnDate);
+  if (slipFile) form.append('slip_attachment', slipFile);
+  if (weighFile) form.append('weighment_attachment', weighFile);
+  if(!form.get('vendor_name') || !form.get('vendor_phone')){ alert('Vendor name and phone number are required'); return; }
+  const saveBtn = document.getElementById('purSaveBtn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving...';
+  try {
+    let res;
+    try {
+      // Change #54: same form, PUT to the row when editing.
+      const editing = editingPurchase !== null;
+      res = await fetch(editing ? '/api/purchases/' + editingPurchase : '/api/purchases',
+                        {method: editing ? 'PUT' : 'POST', body: form});
+    } catch (e) {
+      alert('Could not reach the server. Check your connection and try again.');
+      return;
+    }
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (e) {
+      alert('Server error (HTTP ' + res.status + '). Please try again.');
+      return;
+    }
+    if(!res.ok || !data.success){ alert(data.error || 'Unable to save'); return; }
+    location.reload();
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save';
+  }
+}
+</script>
+{% endblock %}

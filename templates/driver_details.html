@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+{% block title %}Driver Details{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Driver Details</span></div>
+        <h1 class="page-title">Driver Details</h1>
+        <div class="page-subtitle">Driver information related to Purchase Maintenance.</div>
+    </div>
+    <div class="export-actions" style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" type="button" onclick="exportTable('driverDetailsTable','driver_details_export')"><i class="fas fa-download"></i> Export</button>
+        <button class="btn btn-primary" type="button" onclick="openDriverModal()"><i class="fas fa-plus"></i> Add Driver Details</button>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Driver Records</div>
+        <div class="filter-bar">
+            <div class="filter-input"><i class="fas fa-search"></i><input type="text" placeholder="Search driver records..." oninput="searchTable(this,'driverDetailsTable')" aria-label="Search driver records"></div>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="driverDetailsTable">
+            <thead><tr><th>Sl.No</th><th>Driver Name</th><th>Contact Number</th><th>Vehicle Number</th><th>Date of Arrival</th><th>Quantity in Bill</th><th>Actual Quantity</th><th>Invoice</th><th>Weigment</th><th style="width:60px;">Action</th></tr></thead>
+            <tbody>
+            {% for driver in drivers %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td><strong>{{ driver.driver_name or '—' }}</strong></td>
+                    <td>{{ driver.contact_number or '—' }}</td>
+                    <td>{{ driver.vehicle_number or '—' }}</td>
+                    <td>{{ driver.arrival_date or '—' }}</td>
+                    <td>{% if driver.qty_in_bill %}{{ driver.qty_in_bill }}{% else %}—{% endif %}</td>
+                    <td>{% if driver.actual_qty %}{{ driver.actual_qty }}{% else %}—{% endif %}</td>
+                    <td>{% if driver.slip_attachment %}<a href="{{ url_for('driver_slip', filename=driver.slip_attachment) }}" target="_blank" rel="noopener"><i class="fas fa-paperclip"></i> View</a>{% else %}—{% endif %}</td>
+                    <td>{% if driver.weighment_attachment %}<a href="{{ url_for('driver_slip', filename=driver.weighment_attachment) }}" target="_blank" rel="noopener"><i class="fas fa-paperclip"></i> View</a>{% else %}—{% endif %}</td>
+                    <td><div class="row-actions"><button class="action-btn" type="button" title="Delete driver record" style="color:#d32f2f;" onclick="deleteDriver('{{ driver.id }}', '{{ driver.driver_name }}')"><i class="fas fa-trash"></i></button></div></td>
+                </tr>
+            {% else %}
+                <tr><td colspan="10"><div class="empty-state"><i class="fas fa-truck"></i><h3>No driver records found</h3><p>Add a driver or save purchase maintenance data to populate this page.</p></div></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="pagination" style="padding:16px 20px;"><div class="pagination-info">Showing {{ drivers|length }} driver record(s)</div></div>
+</div>
+
+<datalist id="drvNameList">
+    {% for driver in drivers %}{% if driver.driver_name %}<option value="{{ driver.driver_name }}">{% endif %}{% endfor %}
+</datalist>
+
+<div class="modal-overlay" id="driverModal" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.45);align-items:center;justify-content:center;z-index:100;padding:20px;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:560px;padding:22px;max-height:90vh;overflow-y:auto;">
+    <h3 style="margin:0 0 4px;">Add Driver Details</h3>
+    <p style="font-size:12px;color:#66756c;margin:0 0 16px;">Driver information related to Purchase Maintenance.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group"><label class="form-label">Driver Name *</label>
+        <input class="form-control" id="drvName" list="drvNameList" placeholder="Type or select a driver" maxlength="120" autocomplete="off" data-con="name" required>
+      </div>
+      <div class="form-group"><label class="form-label">Contact Number</label>
+        <input class="form-control" id="drvPhone" placeholder="Enter 10-digit contact number" maxlength="10" inputmode="numeric" autocomplete="off" pattern="[0-9]{10}" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)">
+        <div style="font-size:11px;color:#8a988f;margin-top:4px;">Exactly 10 digits (0–9)</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group"><label class="form-label">Vehicle Number *</label>
+        <input class="form-control" id="drvVehicle" placeholder="e.g. KA-99-PU-8907" maxlength="15" autocomplete="off" required data-con="vehicle" oninput="formatVehicleNumber(this)">
+        <div style="font-size:11px;color:#8a988f;margin-top:4px;">Uppercase letters &amp; numbers only</div>
+      </div>
+      <div class="form-group"><label class="form-label">Date of Arrival</label>
+        <input class="form-control" id="drvArrival" type="date">
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group"><label class="form-label">Quantity in Bill</label>
+        <input class="form-control" id="drvBillQty" type="number" min="0" step="any" placeholder="e.g. 500">
+      </div>
+      <div class="form-group"><label class="form-label">Actual Quantity</label>
+        <input class="form-control" id="drvActualQty" type="number" min="0" step="any" placeholder="e.g. 480">
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Invoice Attached File (PDF / JPEG / JPG / PNG) *</label>
+      <input class="form-control" id="drvSlip" type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" required>
+      <div style="font-size:11px;color:#8a988f;margin-top:4px;">Max 4 MB. Photos are compressed automatically.</div>
+    </div>
+    <div class="form-group"><label class="form-label">Weigment Attached File (PDF / JPEG / JPG / PNG) *</label>
+      <input class="form-control" id="drvWeigh" type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" required>
+      <div style="font-size:11px;color:#8a988f;margin-top:4px;">Max 4 MB. Photos are compressed automatically.</div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+      <button class="btn btn-secondary" onclick="closeModal('driverModal')">Cancel</button>
+      <button class="btn btn-primary" id="drvSaveBtn" onclick="saveDriver()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="savedDialog" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.5);align-items:center;justify-content:center;z-index:3000;padding:20px;">
+    <div class="modal" style="background:#fff;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.25);padding:28px;max-width:420px;text-align:center;">
+        <h3 style="margin:0 0 10px;color:#1f4d2e;"><i class="fas fa-check-circle" style="color:#2e8b57;margin-right:8px;"></i>Saved Successfully</h3>
+        <p style="margin:0 0 20px;color:#5a6b60;font-size:14px;">Driver details saved successfully.</p>
+        <button class="btn btn-primary" onclick="closeSavedDialog();" style="width:100%;">OK</button>
+    </div>
+</div>
+
+<script>
+function openDriverModal(){ document.getElementById('driverModal').style.display='flex'; }
+function closeSavedDialog(){
+  document.getElementById('savedDialog').style.display = 'none';
+  document.body.classList.remove('modal-open');
+  window.location.reload();
+}
+function isValidPhone(v){
+  const digits = v.replace(/[^0-9]/g,'');
+  return digits.length === 10;
+}
+function formatVehicleNumber(el){
+  const raw = el.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,10);
+  let out = raw;
+  if (raw.length > 2) out = raw.slice(0,2) + '-' + raw.slice(2);
+  if (raw.length > 4) out = raw.slice(0,2) + '-' + raw.slice(2,4) + '-' + raw.slice(4);
+  if (raw.length > 6) out = raw.slice(0,2) + '-' + raw.slice(2,4) + '-' + raw.slice(4,6) + '-' + raw.slice(6);
+  el.value = out;
+}
+const SLIP_MAX_BYTES = 4 * 1024 * 1024;
+function slipExtensionOk(name){
+  const n = String(name || '').toLowerCase();
+  return n.endsWith('.jpg') || n.endsWith('.jpeg') || n.endsWith('.png') || n.endsWith('.pdf');
+}
+// Phone photos are often 3-8 MB, over the 4 MB upload limit; downscale +
+// JPEG-compress them before sending (PDFs pass through untouched).
+function prepareSlipFile(file){
+  return new Promise(resolve => {
+    const isImage = /^image\//.test(file.type || '');
+    if (!isImage || file.size <= 400 * 1024){ resolve({blob: file, name: file.name}); return; }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = function(){
+      URL.revokeObjectURL(url);
+      const maxSide = 1600;
+      let w = img.naturalWidth, h = img.naturalHeight;
+      if (Math.max(w, h) > maxSide){
+        const k = maxSide / Math.max(w, h);
+        w = Math.round(w * k); h = Math.round(h * k);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      canvas.toBlob(function(blob){
+        if (blob && blob.size && blob.size < file.size){
+          resolve({blob: blob, name: file.name.replace(/\.[^.]+$/, '') + '.jpg'});
+        } else {
+          resolve({blob: file, name: file.name});
+        }
+      }, 'image/jpeg', 0.85);
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); resolve({blob: file, name: file.name}); };
+    img.src = url;
+  });
+}
+(function(){ const el = document.getElementById('drvArrival'); if(el){ const d = new Date(); el.max = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); } })();
+async function saveDriver(){
+  const name = document.getElementById('drvName').value.trim();
+  const phone = document.getElementById('drvPhone').value.trim();
+  if(!name){ alert('Driver Name is required'); return; }
+  if(phone && !isValidPhone(phone)){ alert('Contact number must be exactly 10 digits'); return; }
+  const vehicle = document.getElementById('drvVehicle').value.trim();
+  if(!vehicle){ alert('Vehicle Number is required'); return; }
+  if(!(/[A-Z]/.test(vehicle) && /\d/.test(vehicle))){ alert('Vehicle number must contain both letters and numbers (e.g. KA-99-PU-8907)'); return; }
+  const arrivalPicker = document.getElementById('drvArrival').value;
+  if (!arrivalPicker){ alert('Date of Arrival is required'); return; }
+  const dNow = new Date();
+  const todayIso = dNow.getFullYear() + '-' + String(dNow.getMonth()+1).padStart(2,'0') + '-' + String(dNow.getDate()).padStart(2,'0');
+  if (arrivalPicker > todayIso){ alert('Date of Arrival cannot be in the future'); return; }
+  const arrival = arrivalPicker.split('-').reverse().join('-');
+  const slipInput = document.getElementById('drvSlip');
+  if (!slipInput.files[0]){ alert('Invoice attachment is required (JPG, JPEG, PNG or PDF)'); return; }
+  let slipFile = null;
+  if (slipInput.files[0]){
+    const rawFile = slipInput.files[0];
+    if (!slipExtensionOk(rawFile.name)){ alert('Invoice attachment must be a JPG, JPEG, PNG or PDF file'); return; }
+    const prepared = await prepareSlipFile(rawFile);
+    if (prepared.blob.size > SLIP_MAX_BYTES){ alert('Invoice attachment is too large (max 4 MB)'); return; }
+    slipFile = new File([prepared.blob], prepared.name, {type: prepared.blob.type || rawFile.type || 'application/octet-stream'});
+  }
+  const weighInput = document.getElementById('drvWeigh');
+  if (!weighInput.files[0]){ alert('Weigment attachment is required (JPG, JPEG, PNG or PDF)'); return; }
+  let weighFile = null;
+  if (weighInput.files[0]){
+    const rawFile = weighInput.files[0];
+    if (!slipExtensionOk(rawFile.name)){ alert('Weigment attachment must be a JPG, JPEG, PNG or PDF file'); return; }
+    const prepared = await prepareSlipFile(rawFile);
+    if (prepared.blob.size > SLIP_MAX_BYTES){ alert('Weigment attachment is too large (max 4 MB)'); return; }
+    weighFile = new File([prepared.blob], prepared.name, {type: prepared.blob.type || rawFile.type || 'application/octet-stream'});
+  }
+  const form = new FormData();
+  form.append('driver_name', name);
+  form.append('contact_number', phone);
+  form.append('vehicle_number', vehicle);
+  form.append('arrival_date', arrival);
+  form.append('qty_in_bill', document.getElementById('drvBillQty').value.trim());
+  form.append('actual_qty', document.getElementById('drvActualQty').value.trim());
+  if (slipFile) form.append('slip_attachment', slipFile);
+  if (weighFile) form.append('weighment_attachment', weighFile);
+  const saveBtn = document.getElementById('drvSaveBtn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving...';
+  try {
+    let res;
+    try {
+      res = await fetch('/api/driver-details', {method:'POST', body: form});
+    } catch (e) {
+      alert('Could not reach the server. Check your connection and try again.');
+      return;
+    }
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (e) {
+      alert('Server error (HTTP ' + res.status + '). Please try again.');
+      return;
+    }
+    if(!res.ok || !data.success){ alert(data.error || 'Unable to save'); return; }
+    document.getElementById('savedDialog').style.display = 'flex';
+    document.body.classList.add('modal-open');
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save';
+  }
+}
+async function deleteDriver(id, name){
+  if(!confirm('Delete driver record for "' + (name || 'this driver') + '"? This cannot be undone.')) return;
+  const res = await fetch('/api/driver-details/' + id, {method:'DELETE'});
+  const data = await res.json();
+  if(!res.ok || !data.success){ alert(data.error || 'Unable to delete'); return; }
+  location.reload();
+}
+</script>
+{% endblock %}

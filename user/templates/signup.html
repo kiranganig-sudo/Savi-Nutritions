@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - SAVI Nutrition Portal</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo.png') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    <style>
+      body{margin:0;background:linear-gradient(135deg,#06321c 0%,#0e5c2f 50%,#166534 100%);min-height:100vh;font-family:'Inter',sans-serif;display:flex;align-items:center;justify-content:center;padding:24px;position:relative;overflow:hidden;}
+      .auth-bg{position:fixed;inset:0;z-index:0;pointer-events:none;}
+      .auth-bg span{position:absolute;display:block;border-radius:50%;filter:blur(70px);opacity:.55;}
+      .auth-bg span:nth-child(1){width:360px;height:360px;background:#34d97f;top:-90px;left:-100px;animation:floatBlob 15s ease-in-out infinite;}
+      .auth-bg span:nth-child(2){width:320px;height:320px;background:#124f2e;bottom:-110px;right:-90px;animation:floatBlob 18s ease-in-out infinite;animation-delay:-5s;}
+      .auth-bg span:nth-child(3){width:240px;height:240px;background:#7ce8ab;top:42%;left:58%;opacity:.3;animation:floatBlob 21s ease-in-out infinite;animation-delay:-10s;}
+      .auth-bg span:nth-child(4){width:120px;height:120px;background:#36c17b;top:12%;right:18%;opacity:.4;filter:blur(40px);animation:floatBlob 12s ease-in-out infinite;animation-delay:-3s;}
+      .auth-bg span:nth-child(5){width:90px;height:90px;background:#9cf5c0;bottom:20%;left:12%;opacity:.35;filter:blur(30px);animation:floatBlob 16s ease-in-out infinite;animation-delay:-7s;}
+      @keyframes floatBlob{0%,100%{transform:translate(0,0) scale(1);}33%{transform:translate(55px,-45px) scale(1.15);}66%{transform:translate(-45px,35px) scale(.92);}}
+      .auth-card{position:relative;z-index:1;}
+      .auth-card{background:#fff;border-radius:18px;box-shadow:0 24px 60px rgba(18,60,34,.18);max-width:420px;width:100%;padding:34px;box-sizing:border-box;}
+      .auth-brand{text-align:center;margin-bottom:20px;}
+      .auth-brand img{width:70px;height:auto;border-radius:14px;}
+      .auth-brand h1{margin:12px 0 2px;font-size:22px;color:#123c22;}
+      .auth-brand p{margin:0;font-size:13px;color:#66756c;}
+      .auth-label{display:block;font-size:12.5px;font-weight:600;color:#33433a;margin:13px 0 6px;}
+      .auth-input{width:100%;box-sizing:border-box;padding:11px 13px;border:1px solid #cfd5d1;border-radius:9px;font-size:14px;color:#303734;outline:none;transition:border-color .15s,box-shadow .15s;background:#fbfdfc;}
+      .auth-input:focus{border-color:#1c5c37;box-shadow:0 0 0 3px rgba(28,92,55,.14);}
+      .auth-btn{width:100%;margin-top:20px;padding:12px;border:0;border-radius:9px;background:linear-gradient(135deg,#166534,#0b3d22);color:#fff;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;}
+      .auth-btn:hover{filter:brightness(1.06);}
+      .auth-error{background:#fbecec;color:#b44747;border:1px solid #f3d3d3;border-radius:9px;padding:10px 12px;font-size:12.5px;margin-bottom:6px;}
+      .auth-footer{text-align:center;margin-top:18px;font-size:13px;color:#66756c;}
+      .auth-footer a{color:#1c5c37;font-weight:700;text-decoration:none;}
+      .auth-row{display:flex;gap:12px;}
+      .auth-row .auth-field{flex:1;}
+      .auth-shift{display:flex;gap:12px;margin-top:6px;}
+      .auth-shift label{flex:1;display:flex;align-items:center;gap:9px;padding:12px 13px;border:1.5px solid #cfd5d1;border-radius:10px;cursor:pointer;background:#fbfdfc;transition:all .15s;}
+      .auth-shift input{accent-color:#166534;}
+      .auth-shift label:has(input:checked){border-color:#166534;background:#eef7f0;}
+      .auth-shift .em{font-size:20px;}
+    </style>
+</head>
+<body>
+    <div class="auth-bg"><span></span><span></span><span></span><span></span><span></span></div>
+    <form class="auth-card" method="post" autocomplete="off">
+        <div class="auth-brand">
+            <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Savi Nutrition">
+            <h1>User Sign Up</h1>
+            <p>Choose your Morning or Night shift</p>
+        </div>
+        {% if error %}<div class="auth-error"><i class="fas fa-exclamation-circle"></i> {{ error }}</div>{% endif %}
+        <label class="auth-label" for="full_name">Name</label>
+        <input class="auth-input" id="full_name" name="full_name" placeholder="Your full name" required autofocus>
+        <div class="auth-row">
+            <div class="auth-field">
+                <label class="auth-label" for="login_id">ID</label>
+                <input class="auth-input" id="login_id" name="login_id" placeholder="Your login ID" required>
+            </div>
+            <div class="auth-field">
+                <label class="auth-label" for="phone">Phone No</label>
+                <input class="auth-input" id="phone" name="phone" placeholder="Phone number" required>
+            </div>
+        </div>
+        <div class="auth-row">
+            <div class="auth-field">
+                <label class="auth-label" for="password">Create Password</label>
+                <input class="auth-input" id="password" name="password" type="password" placeholder="Min 6 characters" required>
+            </div>
+            <div class="auth-field">
+                <label class="auth-label" for="confirm_password">Confirm Password</label>
+                <input class="auth-input" id="confirm_password" name="confirm_password" type="password" placeholder="Re-enter password" required>
+            </div>
+        </div>
+        <label class="auth-label">Your Shift</label>
+        <div class="auth-shift">
+            <label>
+                <span class="em">🌅</span>
+                <span style="display:flex;flex-direction:column;"><strong style="font-size:13.5px;">Morning</strong><small style="color:#8a938d;font-size:11px;">Day shift</small></span>
+                <input type="radio" name="shift" value="morning" style="margin-left:auto;" {{ 'checked' if selected_shift == 'morning' else '' }}>
+            </label>
+            <label>
+                <span class="em">🌙</span>
+                <span style="display:flex;flex-direction:column;"><strong style="font-size:13.5px;">Night</strong><small style="color:#8a938d;font-size:11px;">Evening shift</small></span>
+                <input type="radio" name="shift" value="night" style="margin-left:auto;" {{ 'checked' if selected_shift == 'night' else '' }}>
+            </label>
+        </div>
+        <button class="auth-btn" type="submit"><i class="fas fa-user-plus"></i> Create Account &amp; Login</button>
+        <div class="auth-footer">Already have an account? <a href="{{ url_for('login') }}">Login</a></div>
+    </form>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "mode": "hosted",
+  "portal": "admin",
+  "admin_url": "https://admin.savinutritions.online",
+  "user_url": "https://user.savinutritions.online",
+  "window_width": 1440,
+  "window_height": 900
+}

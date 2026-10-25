@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Maintenance Mode{% endblock %}
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:center;min-height:70vh;">
+    <div class="card" style="max-width:520px;width:100%;text-align:center;padding:48px 36px;">
+        <div style="width:84px;height:84px;border-radius:50%;background:#eef4f0;color:#b44747;display:flex;align-items:center;justify-content:center;font-size:36px;margin:0 auto 18px;">
+            <i class="fas fa-tools"></i>
+        </div>
+        <h1 class="page-title" style="margin:0 0 8px;">Maintenance Mode</h1>
+        <p style="color:var(--text-medium);font-size:14px;line-height:1.6;margin:0 0 22px;">
+            {{ settings.company_name }} has temporarily turned on maintenance mode.
+            The user panel is paused. Please check back shortly — the admin will
+            switch it off once work is complete.
+        </p>
+        <span class="badge badge-warning"><i class="fas fa-circle-exclamation"></i> Maintenance in progress</span>
+    </div>
+</div>
+{% endblock %}

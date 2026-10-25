@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Vendors Management{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Vendors Management</span></div>
+        <h1 class="page-title">Vendors List</h1>
+        <div class="page-subtitle">Create and manage vendors with purchase, payment and outstanding details. Read-only — vendors are managed by the user side.</div>
+    </div>
+    <div class="export-actions" style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" type="button" onclick="exportTable('vendorsTable','vendors_export')"><i class="fas fa-download"></i> Export</button>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Vendors <span class="badge badge-primary">{{ vendors|length }}</span></div>
+        <div class="filter-bar">
+            <div class="filter-input"><i class="fas fa-search"></i><input type="text" placeholder="Search vendors..." oninput="searchTable(this,'vendorsTable')" aria-label="Search vendors"></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;" role="group" aria-label="Filter by category">
+            <a class="btn btn-sm {% if category_filter == 'all' %}btn-primary{% else %}btn-secondary{% endif %}" href="{{ url_for('vendors') }}">All Vendors</a>
+            <a class="btn btn-sm {% if category_filter == 'Raw Materials' %}btn-primary{% else %}btn-secondary{% endif %}" href="{{ url_for('vendors', category='Raw Materials') }}">Raw Materials</a>
+            <a class="btn btn-sm {% if category_filter == 'Medicines' %}btn-primary{% else %}btn-secondary{% endif %}" href="{{ url_for('vendors', category='Medicines') }}">Medicines</a>
+            <a class="btn btn-sm {% if category_filter == 'Chemicals' %}btn-primary{% else %}btn-secondary{% endif %}" href="{{ url_for('vendors', category='Chemicals') }}">Chemicals</a>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="vendorsTable">
+            <thead><tr><th>Sl.No</th><th>Name</th><th>Phone Number</th><th>Address</th><th>GSTIN Number</th><th>Products</th><th>Category</th></tr></thead>
+            <tbody>
+            {% for v in vendors %}
+                <tr data-status="{{ v.status }}">
+                    <td>{{ loop.index }}</td><td><strong>{{ v.vendor_name }}</strong></td><td>{{ v.vendor_phone or '—' }}</td><td style="white-space:pre-line">{{ v.address }}</td><td>{{ v.gstin or '—' }}</td>
+                    <td>{% set vgroups = vendor_product_groups(v) %}{% for g in vgroups %}<div style="margin-bottom:2px;">{% if g.group != 'Products' %}<span style="font-size:10.5px;color:#8a988f;">{{ g.group }}:</span>{% endif %} {{ g.products | join(', ') }}</div>{% else %}{{ v.product or '—' }}{% endfor %}</td>
+                    <td><span class="badge {% if v.category == 'Raw Materials' %}badge-info{% elif v.category == 'Medicines' %}badge-success{% elif v.category == 'Chemicals' %}badge-danger{% else %}badge-primary{% endif %}">{{ v.category }}</span></td>
+                </tr>
+            {% else %}
+                <tr><td colspan="7"><div class="empty-state"><i class="fas fa-users"></i><h3>No vendors found</h3><p>Add your first vendor to get started.</p></div></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="pagination" style="padding:16px 20px;"><div class="pagination-info">Showing {{ vendors|length }} vendors</div></div>
+</div>
+
+{% endblock %}

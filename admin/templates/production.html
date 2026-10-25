@@ -1,0 +1,409 @@
+{% extends "base.html" %}
+{% block title %}Production{% endblock %}
+
+{% block content %}
+<style>
+
+/* Production page imported from the supplied prototype */
+.production-prototype{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;color:#152018;}
+.production-prototype .prod-page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap;}
+.production-prototype .prototype-search{min-width:170px;}
+.production-prototype .prototype-card{background:#fff;border:1px solid #e3e8e4;border-radius:10px;box-shadow:0 1px 2px rgba(15,61,36,.06),0 8px 24px -12px rgba(15,61,36,.12);}
+.production-prototype .prototype-card .tabs{border-radius:10px 10px 0 0;}
+.production-prototype .prototype-card .toolbar{padding:16px 18px;}
+.production-prototype .prototype-card table{width:100%;border-collapse:collapse;font-size:13px;}
+.production-prototype .prototype-card thead th{text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;color:#66756c;background:#fafcfa;padding:12px 16px;border-bottom:1px solid #e3e8e4;white-space:nowrap;}
+.production-prototype .prototype-card tbody td{padding:13px 16px;border-bottom:1px solid #eef1ef;vertical-align:middle;}
+.production-prototype .prototype-card tbody tr:hover{background:#fafcfa;}
+.production-prototype .prototype-card tfoot td{padding:13px 16px;font-weight:700;background:#fafcfa;border-top:1px solid #e3e8e4;border-bottom:none;}
+.production-prototype .btn{border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px;white-space:nowrap;}
+.production-prototype .btn-primary{background:#237a45;color:#fff;}
+.production-prototype .btn-ghost{background:#fff;color:#152018;border:1px solid #e3e8e4;}
+.production-prototype .btn-sm{padding:7px 12px;font-size:12.5px;}
+.production-prototype .search-box{position:relative;min-width:200px;}
+.production-prototype .search-box input{width:100%;padding:9px 12px 9px 34px;border:1px solid #e3e8e4;border-radius:8px;font-size:13px;background:#fbfcfb;}
+.production-prototype .search-box svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:#9fb0a6;}
+.production-prototype select.select{padding:9px 30px 9px 12px;border:1px solid #e3e8e4;border-radius:8px;font-size:13px;background:#fbfcfb;color:#152018;}
+.production-prototype .tabs{display:flex;gap:22px;padding:0 18px;border-bottom:1px solid #e3e8e4;background:#fff;}
+.production-prototype .tab{padding:14px 2px;font-size:13.5px;font-weight:600;color:#66756c;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.production-prototype .tab.active{color:#1c5c37;border-color:#237a45;}
+.production-prototype .cell-name{display:flex;align-items:center;gap:10px;font-weight:600;}
+.production-prototype .cell-icon{width:34px;height:34px;border-radius:8px;background:#e6f4ea;color:#1c5c37;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.production-prototype .badge{padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:700;display:inline-block;}
+.production-prototype .badge.in-stock{background:#e6f4ea;color:#1c5c37;}
+.production-prototype .badge.low-stock{background:#fff2df;color:#a15c07;}
+.production-prototype .muted-cell{color:#66756c;}
+.production-prototype .num-strong{font-weight:700;}
+.production-prototype .table-foot{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;font-size:12.5px;color:#66756c;}
+.production-prototype .placeholder-tab{padding:60px 20px;text-align:center;color:#66756c;font-size:13.5px;}
+.production-prototype .hidden{display:none!important;}
+.production-prototype .modal-overlay{position:fixed;inset:0;background:rgba(15,30,20,.45);display:none;align-items:center;justify-content:center;z-index:100;padding:20px;}
+.production-prototype .modal-overlay.show{display:flex;}
+.production-prototype .modal{background:#fff;border-radius:12px;width:100%;max-width:600px;padding:22px;box-shadow:0 30px 60px -20px rgba(0,0,0,.4);position:relative;max-height:88vh;overflow-y:auto;}
+.production-prototype .modal h3{margin:0 0 4px;font-size:16px;}
+.production-prototype .p-sub{font-size:12px;color:#66756c;margin-bottom:16px;}
+.production-prototype .field{margin-bottom:14px;}
+.production-prototype .field label{display:block;font-size:12px;font-weight:600;margin-bottom:6px;}
+.production-prototype .field input,.production-prototype .field textarea{width:100%;padding:9px 12px;border:1px solid #e3e8e4;border-radius:8px;font-size:13px;background:#fbfcfb;}
+.production-prototype .field textarea{resize:vertical;min-height:64px;font-family:inherit;}
+.production-prototype .qty-table{width:100%;border-collapse:collapse;margin-bottom:6px;}
+.production-prototype .qty-table th{font-size:10.5px;text-transform:uppercase;color:#66756c;text-align:left;padding:8px 0;border-bottom:1px solid #e3e8e4;}
+.production-prototype .qty-table td{padding:9px 0;border-bottom:1px solid #f0f3f1;vertical-align:middle;}
+.production-prototype .qty-table td.qty-input-cell{width:140px;}
+.production-prototype .qty-table input[type=number]{width:100%;padding:7px 9px;border:1px solid #e3e8e4;border-radius:7px;font-size:13px;text-align:center;}
+.production-prototype .prod-mini{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;}
+.production-prototype .mini-icon{width:26px;height:26px;border-radius:6px;background:#e6f4ea;color:#1c5c37;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;}
+.production-prototype .panel-actions{display:flex;gap:10px;margin-top:14px;}
+.production-prototype .panel-actions .btn{flex:1;justify-content:center;}
+.production-prototype .how-box{margin-top:18px;background:#f2f8f4;border:1px solid #e6f4ea;border-radius:10px;padding:14px 16px;font-size:12px;color:#134a2c;}
+.production-prototype .how-box h4{margin:0 0 8px;font-size:12.5px;}
+.production-prototype .how-box li{margin-bottom:6px;line-height:1.4;}
+.production-prototype .how-box ul{margin:0;padding-left:18px;}
+@media(max-width:800px){.production-prototype .prod-page-head{flex-direction:column}.production-prototype .production-actions{width:100%;justify-content:flex-start!important}.production-prototype .toolbar{flex-direction:column;align-items:stretch}.production-prototype .search-box{min-width:0;width:100%;}}
+
+</style>
+
+<div class="production-prototype">
+    <div class="prod-page-head">
+        <div>
+            <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Production</span></div>
+            <h1 class="page-title">Production</h1>
+            <div style="font-size:12.5px;color:#66756c;">Track and update daily production quantities</div>
+        </div>
+        <div class="production-actions" style="display:flex;align-items:center;gap:10px;">
+            <div class="search-box prototype-search">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                <input type="text" id="prodDateDisplay" readonly value="{{ productions[0].date if productions else '' }}" style="cursor:pointer;">
+            </div>
+            <button class="btn btn-primary" id="scrollUploadBtn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                Upload Production
+            </button>
+        </div>
+    </div>
+
+    <div class="prototype-card" style="margin-bottom:18px;">
+        <div class="tabs">
+            <div class="tab active" data-tab="overall">Overall</div>
+            <div class="tab" data-tab="old">Old Machine</div>
+            <div class="tab" data-tab="new">New Machine</div>
+            <div class="tab" data-tab="consumption">Consumption Tracking</div>
+        </div>
+
+        <div id="tab-overall">
+            <div style="display:flex;align-items:center;gap:10px;padding:12px 18px 0;flex-wrap:wrap;">
+                <span style="font-size:12.5px;color:#66756c;">Combined total of Old + New machines — the default summary.</span>
+                <button class="btn btn-secondary btn-sm" style="margin-left:auto;" onclick="exportTable('overallTable','production_overall_export')"><i class="fas fa-download"></i> Export</button>
+            </div>
+            <div style="overflow-x:auto;">
+                <table id="overallTable">
+                    <thead>
+                        <tr>
+                            <th>Sl.No</th>
+                            <th>Material</th>
+                            <th>Opening Stock</th>
+                            <th>Consumed</th>
+                            <th>No. of Batches (Old)</th>
+                            <th>No. of Batches (New)</th>
+                            <th>Total Batches</th>
+                            <th>Total Output</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for o in overall_rows %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td><div class="cell-name"><div class="cell-icon">🐄</div>{{ o.name }}</div></td>
+                        <td>{{ "{:,}".format(o.opening) }}</td>
+                        <td>{{ "{:,}".format(o.consumed) }}</td>
+                        <td>{{ o.old_batches }}</td>
+                        <td>{{ o.new_batches }}</td>
+                        <td>{{ o.batches }}</td>
+                        <td class="num-strong">{{ "{:,}".format(o.output) }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="2">Total</td>
+                            <td>{{ "{:,}".format(overall_rows|sum(attribute='opening')) }}</td>
+                            <td>{{ "{:,}".format(overall_rows|sum(attribute='consumed')) }}</td>
+                            <td>{{ overall_rows|sum(attribute='old_batches') }}</td>
+                            <td>{{ overall_rows|sum(attribute='new_batches') }}</td>
+                            <td>{{ overall_rows|sum(attribute='batches') }}</td>
+                            <td>{{ "{:,}".format(overall_rows|sum(attribute='output')) }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        {% for mc in [('old', 'Old Machine', old_entries, old_machine_entries), ('new', 'New Machine', new_entries, new_machine_entries)] %}
+        <div id="tab-{{ mc[0] }}" class="hidden">
+            <div style="padding:12px 18px 0;font-size:12.5px;color:#66756c;">{{ mc[1] }} lines — update batch and consumed per row; add materials and quantity from Upload Production.</div>
+            <div style="overflow-x:auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Sl.No</th>
+                            <th>Material</th>
+                            <th>Quantity</th>
+                            <th>Batch</th>
+                            <th>Consumed</th>
+                            <th>Total Outcome</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for e in mc[2] %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td><div class="cell-name"><div class="cell-icon">🐄</div>{{ e.product }}</div></td>
+                        <td>{{ "{:,}".format(e.quantity) }}</td>
+                        <td class="muted-cell">{{ e.batch }}</td>
+                        <td>{{ "{:,}".format(e.consumed) }}</td>
+                        <td class="num-strong">{{ "{:,}".format(e.quantity - e.consumed) }}</td>
+                        <td><button class="btn btn-ghost btn-sm" onclick="openProdEdit({{ e.id }}, '{{ e.batch }}', {{ e.consumed }}, {{ e.quantity }})">Edit</button></td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" style="text-align:center;color:#66756c;padding:26px;">No {{ mc[1]|lower }} entries yet.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="4">No. of Batches ({{ mc[1] }})</td>
+                            <td colspan="2" class="num-strong">{{ mc[2]|length }}</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            <div style="padding:18px 18px 22px;font-size:13.5px;font-weight:700;color:#1c5c37;border-top:1px solid #e3e8e4;">User Machine Updates ({{ mc[1] }})</div>
+            <div style="overflow-x:auto;padding-bottom:8px;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Sl.No</th>
+                            <th>Product</th>
+                            <th>Material</th>
+                            <th>Quantity</th>
+                            <th>Batch</th>
+                            <th>Consumed</th>
+                            <th>Total Outcome</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for e in mc[3] %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td><div class="cell-name"><div class="cell-icon">🐄</div>{{ e.product_name }}</div></td>
+                        <td><strong>{{ e.material }}</strong></td>
+                        <td>{{ "{:,}".format(e.quantity) }}</td>
+                        <td class="muted-cell">{{ e.batch }}</td>
+                        <td>{{ "{:,}".format(e.consumed) }}</td>
+                        <td class="num-strong">{{ "{:,}".format(e.output) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" style="text-align:center;color:#66756c;padding:26px;">No user machine updates recorded yet.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endfor %}
+
+        <div id="tab-consumption" class="hidden">
+            <div style="padding:16px 18px;border-bottom:1px solid #e3e8e4;font-size:12.5px;color:#66756c;">Every consumed update tracked here — admin can see who consumed what and how much. Total consumed: <strong>{{ "{:,}".format(consumption_total) }}</strong></div>
+            <div style="overflow-x:auto;">
+            <table>
+                <thead><tr><th>Date</th><th>Product</th><th>Material</th><th>Consumed Qty</th><th>By</th></tr></thead>
+                <tbody>
+                {% for l in consumption_logs %}
+                    <tr>
+                        <td class="muted-cell">{{ l.date }}</td>
+                        <td><div class="cell-name"><div class="cell-icon">🐄</div>{{ l.product_name }}</div></td>
+                        <td><strong>{{ l.material }}</strong></td>
+                        <td class="num-strong">{{ "{:,}".format(l.quantity) }}</td>
+                        <td><span class="badge {% if l.actor == 'Admin' %}in-stock{% else %}low-stock{% endif %}">{{ l.actor }}</span></td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="5" style="text-align:center;color:#66756c;padding:26px;">No consumption recorded yet. Use Consume in any inventory to track here.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="production-prototype">
+    <div class="modal-overlay" id="uploadModalOverlay">
+        <div class="modal">
+            <button class="modal-close" id="uploadModalClose" aria-label="Close" style="position:absolute;top:16px;right:16px;width:28px;height:28px;border:none;background:transparent;color:#66756c;cursor:pointer;">
+                <i class="fas fa-times"></i>
+            </button>
+            <h3>Upload Daily Production</h3>
+            <div class="p-sub">Enter the production quantity for today</div>
+
+            <div class="field">
+                <label>Production Date</label>
+                <input type="date" id="prodDateInput" value="{{ now_date if now_date else '' }}" max="{{ now_date if now_date else '' }}">
+            </div>
+
+            <div class="field">
+                <label>Machine</label>
+                <select id="prodMachineInput" class="select" style="width:100%;padding:9px 12px;border:1px solid #e3e8e4;border-radius:8px;background:#fbfcfb;"><option>Old Machine</option><option>New Machine</option></select>
+            </div>
+
+            <table class="qty-table">
+                <thead><tr><th>Product</th><th style="text-align:right;">Production Quantity (Bags)</th></tr></thead>
+                <tbody id="qtyTbody">
+                {% for p in products %}
+                    <tr>
+                        <td><div class="prod-mini"><div class="mini-icon">{% if p.category == 'Finished Goods' %}🐄{% else %}📦{% endif %}</div>{{ p.name }}</div></td>
+                        <td class="qty-input-cell"><input type="number" min="0" data-product="{{ p.name }}" class="qtyInput" value="0"></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+
+            <div class="field" style="margin-top:14px;">
+                <label>Notes (Optional)</label>
+                <textarea id="prodNotes" placeholder="Enter any notes about today's production..."></textarea>
+            </div>
+
+            <div class="panel-actions">
+                <button class="btn btn-ghost" id="resetProdBtn">Reset</button>
+                <button class="btn btn-primary" id="saveProdBtn"><i class="fas fa-save"></i> Save Production</button>
+            </div>
+
+            <div class="how-box">
+                <h4>How it works?</h4>
+                <ul>
+                    <li>Pick the date, machine and enter the production quantity for each product.</li>
+                    <li>Save adds stock and lists every line under its <strong>machine tab</strong>.</li>
+                    <li>Open any row's <strong>Edit</strong> to update its batch and consumed.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="prodEditOverlay">
+        <div class="modal">
+            <button class="modal-close" id="prodEditClose" aria-label="Close" style="position:absolute;top:16px;right:16px;width:28px;height:28px;border:none;background:transparent;color:#66756c;cursor:pointer;">
+                <i class="fas fa-times"></i>
+            </button>
+            <h3>Update Batch Entry</h3>
+            <div class="p-sub">Users can update batch and consumed here.</div>
+            <div class="field">
+                <label>Batch</label>
+                <input type="text" id="prodEditBatch" style="width:100%;padding:9px 12px;border:1px solid #e3e8e4;border-radius:8px;background:#fbfcfb;">
+            </div>
+            <div class="field">
+                <label>Consumed</label>
+                <input type="number" min="0" id="prodEditConsumed" style="width:100%;padding:9px 12px;border:1px solid #e3e8e4;border-radius:8px;background:#fbfcfb;">
+            </div>
+            <div class="panel-actions">
+                <button class="btn btn-ghost" id="prodEditCancel">Cancel</button>
+                <button class="btn btn-primary" id="prodEditSave"><i class="fas fa-save"></i> Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+    const root = document.querySelector('.production-prototype');
+    if(!root) return;
+
+    function switchProdTab(name){
+        document.querySelectorAll('.production-prototype .tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+        ['overall','old','new','consumption'].forEach(id=>{
+            const el = document.getElementById('tab-'+id);
+            if(el) el.classList.toggle('hidden', id !== name);
+        });
+    }
+
+    // Tabs
+    document.querySelectorAll('.production-prototype .tab').forEach(tab=>{
+        tab.addEventListener('click', ()=> switchProdTab(tab.dataset.tab));
+    });
+
+    // Modal
+    const modal = document.getElementById('uploadModalOverlay');
+    document.getElementById('scrollUploadBtn').addEventListener('click', ()=>{
+        document.querySelectorAll('.qtyInput').forEach(i=>i.value=0);
+        document.getElementById('prodNotes').value='';
+        modal.classList.add('show');
+    });
+    document.getElementById('uploadModalClose').addEventListener('click', ()=>modal.classList.remove('show'));
+    modal.addEventListener('click', e=>{ if(e.target===modal) modal.classList.remove('show'); });
+
+    document.getElementById('resetProdBtn').addEventListener('click', ()=>{
+        document.querySelectorAll('.qtyInput').forEach(i=>i.value=0);
+        document.getElementById('prodNotes').value='';
+    });
+
+    function showToast(msg, ok){
+        const t = document.createElement('div');
+        t.textContent = msg;
+        Object.assign(t.style,{position:'fixed',bottom:'24px',right:'24px',background: ok===false ? '#b44747' : '#134a2c',color:'#fff',padding:'13px 18px',borderRadius:'9px',fontSize:'13px',fontWeight:'600',zIndex:200});
+        document.body.appendChild(t);
+        setTimeout(()=>t.remove(),3200);
+    }
+
+    document.getElementById('saveProdBtn').addEventListener('click', async ()=>{
+        const date = document.getElementById('prodDateInput').value || '';
+        const notes = document.getElementById('prodNotes').value || '';
+        const machine = document.getElementById('prodMachineInput').value || 'Old Machine';
+        const items = Array.from(document.querySelectorAll('.qtyInput')).map(input=>({
+            product: input.dataset.product,
+            quantity: Math.max(0, Number(input.value)||0)
+        })).filter(x=>x.quantity > 0);
+        if(!items.length){ showToast('Enter a quantity above zero for at least one product.', false); return; }
+        const btn = document.getElementById('saveProdBtn');
+        btn.disabled = true;
+        try {
+            const res = await fetch('/api/production/bulk', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({date: date, items: items, notes: notes, machine: machine})});
+            const data = await res.json();
+            if(!res.ok || !data.success) throw new Error(data.error || 'Unable to save production');
+            location.reload();
+        } catch(err){
+            btn.disabled = false;
+            showToast(err.message || 'Unable to save production', false);
+        }
+    });
+
+    // Update batch + consumed per row (user-editable)
+    let prodEditId = null;
+    let prodEditMax = 0;
+    window.openProdEdit = function(id, batch, consumed, quantity){
+        prodEditId = id;
+        prodEditMax = quantity;
+        document.getElementById('prodEditBatch').value = batch;
+        document.getElementById('prodEditConsumed').value = consumed;
+        document.getElementById('prodEditOverlay').classList.add('show');
+    };
+    document.getElementById('prodEditClose').addEventListener('click', ()=> document.getElementById('prodEditOverlay').classList.remove('show'));
+    document.getElementById('prodEditCancel').addEventListener('click', ()=> document.getElementById('prodEditOverlay').classList.remove('show'));
+    document.getElementById('prodEditSave').addEventListener('click', async ()=>{
+        const batch = document.getElementById('prodEditBatch').value.trim();
+        const consumed = Math.max(0, Number(document.getElementById('prodEditConsumed').value || 0));
+        if(!batch){ showToast('Batch cannot be empty.', false); return; }
+        if(consumed > prodEditMax){ showToast('Consumed cannot exceed quantity (' + prodEditMax + ').', false); return; }
+        try {
+            const res = await fetch('/api/production/' + prodEditId, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({batch: batch, consumed: consumed})});
+            const data = await res.json();
+            if(!res.ok || !data.success) throw new Error(data.error || 'Unable to update');
+            location.reload();
+        } catch(err){
+            showToast(err.message || 'Unable to update', false);
+        }
+    });
+
+})();
+
+</script>
+{% endblock %}

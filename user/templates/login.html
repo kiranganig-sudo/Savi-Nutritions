@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - SAVI Nutrition Portal</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo.png') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    <style>
+      body{margin:0;background:linear-gradient(135deg,#06321c 0%,#0e5c2f 50%,#166534 100%);min-height:100vh;font-family:'Inter',sans-serif;display:flex;align-items:center;justify-content:center;padding:24px;position:relative;overflow:hidden;}
+      .auth-bg{position:fixed;inset:0;z-index:0;pointer-events:none;}
+      .auth-bg span{position:absolute;display:block;border-radius:50%;filter:blur(70px);opacity:.55;}
+      .auth-bg span:nth-child(1){width:360px;height:360px;background:#34d97f;top:-90px;left:-100px;animation:floatBlob 15s ease-in-out infinite;}
+      .auth-bg span:nth-child(2){width:320px;height:320px;background:#124f2e;bottom:-110px;right:-90px;animation:floatBlob 18s ease-in-out infinite;animation-delay:-5s;}
+      .auth-bg span:nth-child(3){width:240px;height:240px;background:#7ce8ab;top:42%;left:58%;opacity:.3;animation:floatBlob 21s ease-in-out infinite;animation-delay:-10s;}
+      .auth-bg span:nth-child(4){width:120px;height:120px;background:#36c17b;top:12%;right:18%;opacity:.4;filter:blur(40px);animation:floatBlob 12s ease-in-out infinite;animation-delay:-3s;}
+      .auth-bg span:nth-child(5){width:90px;height:90px;background:#9cf5c0;bottom:20%;left:12%;opacity:.35;filter:blur(30px);animation:floatBlob 16s ease-in-out infinite;animation-delay:-7s;}
+      @keyframes floatBlob{0%,100%{transform:translate(0,0) scale(1);}33%{transform:translate(55px,-45px) scale(1.15);}66%{transform:translate(-45px,35px) scale(.92);}}
+      .auth-card{position:relative;z-index:1;}
+      .auth-card{background:#fff;border-radius:18px;box-shadow:0 24px 60px rgba(18,60,34,.18);max-width:420px;width:100%;padding:36px 34px;box-sizing:border-box;}
+      .auth-brand{text-align:center;margin-bottom:24px;}
+      .auth-brand img{width:74px;height:auto;border-radius:14px;}
+      .auth-brand h1{margin:12px 0 2px;font-size:22px;color:#123c22;}
+      .auth-brand p{margin:0;font-size:13px;color:#66756c;}
+      .auth-label{display:block;font-size:12.5px;font-weight:600;color:#33433a;margin:14px 0 6px;}
+      .auth-input{width:100%;box-sizing:border-box;padding:11px 13px;border:1px solid #cfd5d1;border-radius:9px;font-size:14px;color:#303734;outline:none;transition:border-color .15s,box-shadow .15s;background:#fbfdfc;}
+      .auth-input:focus{border-color:#1c5c37;box-shadow:0 0 0 3px rgba(28,92,55,.14);}
+      .auth-btn{width:100%;margin-top:20px;padding:12px;border:0;border-radius:9px;background:linear-gradient(135deg,#166534,#0b3d22);color:#fff;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;}
+      .auth-btn:hover{filter:brightness(1.06);}
+      .auth-error{background:#fbecec;color:#b44747;border:1px solid #f3d3d3;border-radius:9px;padding:10px 12px;font-size:12.5px;margin-bottom:6px;}
+      .auth-footer{text-align:center;margin-top:18px;font-size:13px;color:#66756c;}
+      .auth-footer a{color:#1c5c37;font-weight:700;text-decoration:none;}
+      .auth-note{margin-top:16px;padding:11px 13px;background:#f5f9f6;border:1px dashed #cfe3d4;border-radius:9px;font-size:12px;color:#55605b;line-height:1.55;}
+      .pw-wrap{position:relative;}
+      .pw-wrap .auth-input{padding-right:42px;}
+      .pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;color:#7b8a81;cursor:pointer;font-size:15px;padding:6px;}
+      .pw-eye:hover{color:#1c5c37;}
+      .auth-contact{margin-top:14px;}
+      .ac-row{display:flex;gap:8px;margin-bottom:8px;}
+      .ac-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:9px 10px;border-radius:9px;font-size:12.5px;font-weight:700;text-decoration:none;color:#123c22;background:#e9f6ee;border:1px solid #bfe3cd;cursor:pointer;}
+      .ac-btn.ac-wa{background:#e8f7ee;}
+      .ac-btn:hover{filter:brightness(.97);}
+      .ac-toggle{width:100%;background:none;border:1px dashed #cfe3d4;color:#1c5c37;font-size:12px;font-weight:700;border-radius:9px;padding:8px 10px;cursor:pointer;}
+      .ac-toggle:hover{background:#f5f9f6;}
+      .ac-box{margin-top:8px;display:flex;flex-direction:column;gap:8px;}
+      .ac-box textarea{box-sizing:border-box;width:100%;padding:9px 11px;border:1px solid #cfd5d1;border-radius:9px;font-size:13px;font-family:inherit;color:#303734;outline:none;resize:vertical;background:#fbfdfc;}
+      .ac-box textarea:focus{border-color:#1c5c37;box-shadow:0 0 0 3px rgba(28,92,55,.14);}
+      .ac-send{padding:9px;border:0;border-radius:9px;background:linear-gradient(135deg,#166534,#0b3d22);color:#fff;font-size:13px;font-weight:700;cursor:pointer;}
+      .ac-send:disabled{opacity:.6;cursor:default;}
+      .ac-sent{font-size:12px;color:#1c5c37;font-weight:600;}
+      .auth-shift{display:flex;gap:10px;margin-top:6px;}
+      .as-card{flex:1;display:flex;align-items:center;gap:9px;padding:10px 12px;border:1.5px solid #cfd5d1;border-radius:9px;cursor:pointer;background:#fbfdfc;transition:border-color .15s,background .15s;}
+      .as-card:has(input:checked){border-color:#166534;background:#eef7f0;}
+      .as-card .as-ico{font-size:17px;color:#8a9383;transition:color .15s;}
+      .as-card:has(input:checked) .as-ico{color:#166534;}
+      .as-txt{display:flex;flex-direction:column;line-height:1.25;}
+      .as-txt strong{font-size:13px;color:#303734;}
+      .as-txt small{font-size:11px;color:#8a938d;}
+      .as-card input{margin-left:auto;accent-color:#166534;}
+    </style>
+</head>
+<body>
+    <div class="auth-bg"><span></span><span></span><span></span><span></span><span></span></div>
+    <form class="auth-card" method="post" autocomplete="off">
+        <div class="auth-brand">
+            <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Savi Nutrition">
+            <h1>SAVI Nutrition</h1>
+            <p>User Portal — Sign in with your ID &amp; password</p>
+        </div>
+        {% if error %}<div class="auth-error" id="loginError"><i class="fas fa-exclamation-circle"></i> {{ error }}</div>{% endif %}
+        <label class="auth-label" for="login_id">ID</label>
+        <input class="auth-input" id="login_id" name="login_id" inputmode="numeric" placeholder="Enter your ID — 6 digits, e.g. 000000" title="Exactly 6 digits (numbers only)" required autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+        <label class="auth-label" for="password">Password</label>
+        <div class="pw-wrap">
+            <input class="auth-input" id="password" name="password" type="password" placeholder="Enter your password" required autocomplete="off">
+            <button class="pw-eye" id="pwEye" type="button" aria-label="Show password"><i class="fas fa-eye"></i></button>
+        </div>
+        <label class="auth-label">Shift *</label>
+        <div class="auth-shift">
+            <label class="as-card">
+                <i class="fas fa-sun as-ico"></i>
+                <span class="as-txt"><strong>Morning</strong><small>Day shift</small></span>
+                <input type="radio" name="shift" value="morning" required {{ 'checked' if selected_shift == 'morning' }}>
+            </label>
+            <label class="as-card">
+                <i class="fas fa-moon as-ico"></i>
+                <span class="as-txt"><strong>Night</strong><small>Evening shift</small></span>
+                <input type="radio" name="shift" value="night" required {{ 'checked' if selected_shift == 'night' }}>
+            </label>
+        </div>
+        <button class="auth-btn" type="submit"><i class="fas fa-sign-in-alt"></i> Login</button>
+        <div class="auth-note"><i class="fas fa-info-circle"></i> Your account is created by the admin. Pick your <strong>Morning or Night shift at every login</strong> — to change shift, log out and choose the other one when you log in. Your current shift is shown in the portal header and to the admin.</div>
+        <div class="auth-contact" id="authContact" hidden>
+            <div class="ac-row" id="acRow" hidden>
+                <a class="ac-btn" id="acCall" href="#" role="button"><i class="fas fa-phone"></i> Call admin</a>
+                <a class="ac-btn ac-wa" id="acWa" href="#" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i> WhatsApp</a>
+            </div>
+            <button class="ac-toggle" id="acToggle" type="button"><i class="fas fa-envelope"></i> Send a message to the admin</button>
+            <div class="ac-box" id="acBox" hidden>
+                <textarea id="acMsg" rows="3" maxlength="500" placeholder="Type your message — e.g. your ID and what help you need."></textarea>
+                <button class="ac-send" id="acSend" type="button">Send message</button>
+            </div>
+        </div>
+    </form>
+    <div id="callAdminDialog" style="display:none;position:fixed;inset:0;background:rgba(8,30,18,.6);align-items:center;justify-content:center;z-index:60;padding:24px;">
+        <div style="background:#fff;border-radius:16px;max-width:320px;width:100%;padding:26px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.3);">
+            <div style="width:56px;height:56px;border-radius:50%;background:#e7f5ea;color:#1c5c37;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 12px;"><i class="fas fa-headset"></i></div>
+            <h3 style="margin:0 0 6px;font-size:17px;color:#123c22;">Call Admin</h3>
+            <p style="font-size:13px;color:#66756c;margin:0 0 14px;">Tap the number below to call the admin.</p>
+            <a id="callAdminNumber" href="tel:9980509508" style="display:block;text-decoration:none;padding:12px;border-radius:9px;background:linear-gradient(135deg,#166534,#0b3d22);color:#fff;font-size:16px;font-weight:700;"><i class="fas fa-phone"></i> <span id="callAdminNumberText">+91 9980509508</span></a>
+            <button type="button" class="ac-toggle" id="callAdminClose" style="margin-top:12px;">Close</button>
+        </div>
+    </div>
+    <script>
+    (function(){
+      var B = {{ request.script_root|tojson }};
+      function getJSON(u){ return fetch(B + u, {credentials:'same-origin'}).then(function(r){ return r.json(); }); }
+
+      /* Back-button fix: if this login page was restored from the back/forward
+         cache while a session is still alive, go straight to the dashboard. */
+      function bounceIfLoggedIn(){
+        getJSON('/api/auth-state').then(function(d){
+          if (d && d.logged_in) location.replace(B + '/dashboard');
+        }).catch(function(){});
+      }
+      window.addEventListener('pageshow', function(e){ if (e.persisted) bounceIfLoggedIn(); });
+      document.addEventListener('DOMContentLoaded', bounceIfLoggedIn);
+
+      /* Show/hide password */
+      var eye = document.getElementById('pwEye');
+      eye.addEventListener('click', function(){
+        var pw = document.getElementById('password');
+        var show = pw.type === 'password';
+        pw.type = show ? 'text' : 'password';
+        eye.innerHTML = show ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+        eye.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+      });
+
+      /* The Login ID is matched EXACTLY by the server. Nothing is rewritten
+         here any more: letters, spaces and a wrong length all stay in the box
+         and the login is REFUSED. The old digit filter silently turned
+         "00a0000" into "000000" (and maxlength silently cut "0000001" to
+         "000000"), which matched a real account the user never typed. */
+      (function(){
+        var idEl = document.getElementById('login_id');
+        var pwEl = document.getElementById('password');
+        /* Browser/password-manager autofill must not fill a valid ID: the
+           boxes stay readonly until the user actually touches them. */
+        [idEl, pwEl].forEach(function(el){
+          if(!el) return;
+          el.setAttribute('autocomplete', 'off');
+          el.setAttribute('data-lpignore', 'true');
+          el.readOnly = true;
+          ['focus', 'keydown', 'paste', 'mousedown'].forEach(function(ev){
+            el.addEventListener(ev, function(){ this.readOnly = false; }, {once: true});
+          });
+        });
+        var loginErrorBox = document.getElementById('loginError');
+        function showLoginError(text){
+          if(!loginErrorBox){
+            loginErrorBox = document.createElement('div');
+            loginErrorBox.className = 'auth-error';
+            loginErrorBox.id = 'loginError';
+            idEl.parentNode.insertBefore(loginErrorBox, idEl);
+          }
+          loginErrorBox.innerHTML = '<i class="fas fa-exclamation-circle"></i> ';
+          loginErrorBox.appendChild(document.createTextNode(text));
+          loginErrorBox.hidden = false;
+        }
+        document.querySelector('form.auth-card').addEventListener('submit', function(e){
+          var raw = (idEl.value || '');
+          if(!/^[0-9]{6}$/.test(raw)){
+            e.preventDefault();
+            showLoginError(raw
+              ? 'Login ID must be exactly 6 digits (numbers only) — it is matched exactly as typed.'
+              : 'Enter your Login ID (6 digits, numbers only).');
+            idEl.focus();
+            return;
+          }
+          /* the shift choice is mandatory - keep the browser's own guard but
+             make sure a rejected submit never reaches the server */
+          var picked = document.querySelector("input[name='shift']:checked");
+          if(!picked){
+            e.preventDefault();
+            showLoginError('Choose Morning or Night to continue.');
+          }
+        });
+      })();
+
+      /* Contact the admin: phone/WhatsApp (if a number is configured) + message box */
+      var adminNumber = '';
+      function isMobileUA(){
+        return /android|iphone|ipad|ipod|windows phone|mobile|opera mini/i.test(
+          (navigator.userAgent || '').toLowerCase());
+      }
+      function whatsappUrl(num){
+        /* Phone -> open the WhatsApp app via wa.me. Desktop -> open WhatsApp Web
+           (the QR / scanner page) so a laptop user can pair their phone. */
+        return isMobileUA()
+          ? 'https://wa.me/' + num
+          : 'https://web.whatsapp.com/send?phone=' + num;
+      }
+      getJSON('/api/contact-info').then(function(d){
+        document.getElementById('authContact').hidden = false;
+        var p = ((d && d.phone) || '').replace(/\D/g, '');
+        if (p.length >= 10){
+          var row = document.getElementById('acRow'); row.hidden = false;
+          var cc = '91', local = p;
+          if (p.length > 10 && p.indexOf('91') === 0){ local = p.slice(2); }
+          else if (p.length > 10){ cc = p.slice(0, p.length - 10); local = p.slice(-10); }
+          adminNumber = cc + local;
+          document.getElementById('acCall').href = 'tel:+' + adminNumber;
+          var wa = document.getElementById('acWa');
+          wa.href = whatsappUrl(adminNumber);
+          if (isMobileUA()){ wa.removeAttribute('target'); wa.removeAttribute('rel'); }
+        }
+      }).catch(function(){});
+
+      /* "Call admin" opens a dialog that shows the admin's number (so the
+         visitor can read/copy it and tap to dial). */
+      function showNumberDialog(num){
+        var digits = String(num || '').replace(/\D/g, '');
+        if (!digits) return;
+        document.getElementById('callAdminNumber').href = 'tel:+' + digits;
+        document.getElementById('callAdminNumberText').textContent = '+ ' + digits;
+        document.getElementById('callAdminDialog').style.display = 'flex';
+      }
+      document.getElementById('acCall').addEventListener('click', function(e){
+        e.preventDefault();
+        showNumberDialog(adminNumber || (this.getAttribute('href') || ''));
+      });
+      document.getElementById('callAdminClose').addEventListener('click', function(){
+        document.getElementById('callAdminDialog').style.display = 'none';
+      });
+      document.getElementById('callAdminDialog').addEventListener('click', function(e){
+        if (e.target === this) this.style.display = 'none';
+      });
+
+      var acToggle = document.getElementById('acToggle');
+      acToggle.addEventListener('click', function(){
+        var box = document.getElementById('acBox');
+        box.hidden = !box.hidden;
+        if (!box.hidden) document.getElementById('acMsg').focus();
+      });
+      document.getElementById('acSend').addEventListener('click', function(){
+        var btn = this;
+        var text = (document.getElementById('acMsg').value || '').trim();
+        if (!text){ alert('Please type a message first.'); return; }
+        btn.disabled = true;
+        fetch(B + '/api/messages/login-send', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({message: text})
+        }).then(function(r){ return r.json(); }).then(function(d){
+          btn.disabled = false;
+          if (d && d.success){
+            document.getElementById('acMsg').value = '';
+            document.getElementById('acBox').hidden = true;
+            var note = document.createElement('div');
+            note.className = 'ac-sent';
+            note.textContent = 'Message sent to the admin — they will see it in their inbox.';
+            acToggle.after(note);
+            setTimeout(function(){ note.remove(); }, 6000);
+          } else {
+            alert((d && d.error) || 'Could not send the message.');
+          }
+        }).catch(function(){ btn.disabled = false; alert('Could not send the message. Please try again.'); });
+      });
+    })();
+    </script>
+</body>
+</html>

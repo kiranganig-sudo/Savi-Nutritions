@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<style>
+  .backup-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+  .backup-option{border:1px solid #e5ebe7;border-radius:12px;padding:18px;background:#f8faf9;text-align:left;}
+  .backup-option .bi{width:44px;height:44px;border-radius:12px;background:#e7f5ea;color:#1c5c37;display:flex;align-items:center;justify-content:center;font-size:19px;margin-bottom:12px;}
+  .backup-option h4{margin:0 0 6px;font-size:14.5px;}
+  .backup-option p{margin:0 0 14px;font-size:12px;color:#66756c;line-height:1.5;}
+  @media(max-width:900px){.backup-grid{grid-template-columns:1fr;}}
+
+  /* ---- locked download overlay ---- */
+  #backupOverlay{display:none;position:fixed;inset:0;background:rgba(10,25,18,.72);z-index:3000;align-items:center;justify-content:center;padding:20px;}
+  #backupOverlay.show{display:flex;}
+  .dl-box{background:#fff;border-radius:18px;width:100%;max-width:460px;padding:30px 30px 26px;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.45);}
+  .dl-box h3{margin:0 0 4px;font-size:18px;}
+  .dl-sub{font-size:12.5px;color:#66756c;margin:0 0 18px;}
+
+  /* ---- 3D milk container ---- */
+  .milk-stage{position:relative;width:170px;margin:6px auto 4px;}
+  .milk-lid{width:76px;height:16px;margin:0 auto;background:linear-gradient(180deg,#2e7d46,#14452a);border-radius:7px 7px 3px 3px;box-shadow:inset 0 2px 3px rgba(255,255,255,.35);}
+  .milk-neck{width:104px;height:12px;margin:0 auto;background:linear-gradient(90deg,#9db8a8,#e6f2ea 30%,#f7fbf8 50%,#e6f2ea 70%,#9db8a8);border:1px solid #c4d4c9;border-bottom:none;}
+  .milk-jar{position:relative;width:150px;height:190px;margin:0 auto;border:3px solid #cfdde8;border-top:none;border-radius:6px 6px 30px 30px;overflow:hidden;background:linear-gradient(90deg,rgba(160,190,205,.35) 0%,rgba(255,255,255,.15) 12%,rgba(255,255,255,.05) 50%,rgba(255,255,255,.15) 88%,rgba(160,190,205,.35) 100%),linear-gradient(180deg,#f4fafd,#e8f2f8);}
+  .milk-fill{position:absolute;left:0;right:0;bottom:0;height:0%;background:linear-gradient(180deg,#ffffff 0%,#eef7ff 45%,#d3e7fa 100%);transition:height .25s linear;}
+  .milk-wave{position:absolute;top:-13px;left:-50%;width:200%;height:26px;}
+  .milk-wave::before,.milk-wave::after{content:'';position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(255,255,255,.85);border-radius:42%;}
+  .milk-wave::before{animation:milkspin 3.2s linear infinite;}
+  .milk-wave::after{background:rgba(214,233,250,.9);border-radius:47%;animation:milkspin 5.1s linear infinite reverse;}
+  @keyframes milkspin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+  .milk-shine{position:absolute;top:8px;bottom:14px;left:12px;width:16px;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,.85),rgba(255,255,255,.1));z-index:2;}
+  .milk-pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;color:#14452a;text-shadow:0 1px 0 #fff;z-index:3;}
+  .milk-shadow{width:130px;height:14px;margin:8px auto 0;border-radius:50%;background:radial-gradient(ellipse at center,rgba(0,0,0,.28),transparent 70%);}
+  .milk-status{font-size:13px;font-weight:600;color:#1c5c37;min-height:20px;margin:12px 0 8px;}
+  .milk-bar{height:10px;background:#edf0f5;border-radius:8px;overflow:hidden;}
+  .milk-bar>div{height:100%;width:0%;border-radius:8px;background:linear-gradient(90deg,#2e9e5b,#1c5c37);transition:width .25s linear;}
+
+  .dl-success{display:none;}
+  .dl-success .ok-ring{width:74px;height:74px;border-radius:50%;background:#e7f5ea;color:#1c5c37;display:flex;align-items:center;justify-content:center;font-size:32px;margin:4px auto 12px;}
+  .dl-fileinfo{font-size:12.5px;color:#66756c;background:#f4f8f5;border:1px solid #e2ece4;border-radius:10px;padding:10px 14px;margin:0 0 16px;word-break:break-all;}
+  .dl-error{display:none;background:#fbecec;color:#b44747;border-radius:10px;padding:10px 14px;font-size:12.5px;margin:0 0 14px;}
+</style>
+
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Settings</span></div>
+        <h1 class="page-title">Settings</h1>
+        <div class="page-subtitle">Manage the company profile, inventory rules and notifications. Saved to SQLite.</div>
+    </div>
+</div>
+
+{% if saved %}<div class="alert alert-success" role="status"><i class="fas fa-check-circle"></i> Settings saved to database.</div>{% endif %}
+
+<form method="post" action="{{ url_for('settings') }}">
+    <div class="grid-2" style="margin-bottom:24px;">
+        <div class="card"><div class="card-header"><div class="card-title"><i class="fas fa-building" style="color:var(--primary);margin-right:8px;"></i> Company Profile</div></div><div class="card-body">
+            <div class="form-group"><label class="form-label" for="companyName">Company name</label><input class="form-control" id="companyName" name="company_name" value="{{ settings.company_name }}" required data-con="name"></div>
+            <div class="form-group"><label class="form-label" for="location">Primary location</label><input class="form-control" id="location" name="location" value="{{ settings.location }}" required></div>
+            <div class="form-group"><label class="form-label" for="currencySymbol">Currency symbol</label><input class="form-control" id="currencySymbol" name="currency_symbol" value="{{ settings.currency_symbol }}" maxlength="4" required></div>
+            <div class="form-group"><label class="form-label" for="adminContactPhone">Admin contact phone (WhatsApp / call)</label><input class="form-control" id="adminContactPhone" name="admin_contact_phone" value="{{ settings.admin_contact_phone or '' }}" maxlength="10" pattern="[0-9]{10}" title="Exactly 10 digits (0-9)" inputmode="numeric" placeholder="e.g. 9876543210" data-con="phone"><div style="font-size:12px;color:#66756c;margin-top:6px;"><i class="fas fa-info-circle"></i> Shown on the user login page as Call / WhatsApp buttons. Enter exactly 10 digits (0-9). Leave empty to hide the buttons.</div></div>
+        </div></div>
+        <div class="card"><div class="card-header"><div class="card-title"><i class="fas fa-sliders" style="color:var(--primary);margin-right:8px;"></i> Inventory Rules</div></div><div class="card-body">
+            <div class="form-group"><label class="form-label" for="allocationRule">Allocation rule</label><select class="form-control" id="allocationRule" name="allocation_rule"><option value="FIFO" {% if settings.allocation_rule == 'FIFO' %}selected{% endif %}>FIFO — oldest stock first</option><option value="FEFO" {% if settings.allocation_rule == 'FEFO' %}selected{% endif %}>FEFO — earliest expiry first</option><option value="LIFO" {% if settings.allocation_rule == 'LIFO' %}selected{% endif %}>LIFO — newest stock first</option></select></div>
+            <p style="font-size:13px;color:var(--text-medium);margin-bottom:14px;">These rules control how the demo presents allocation readiness. The installed desktop app uses its own verified inventory service.</p>
+            <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-medium);margin-bottom:14px;"><input type="checkbox" name="low_stock_notifications" {% if settings.low_stock_notifications %}checked{% endif %}> Show low-stock notifications</label>
+            <label style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-medium);"><input type="checkbox" name="daily_digest" {% if settings.daily_digest %}checked{% endif %}> Enable daily inventory digest</label>
+        </div></div>
+    </div>
+    <div class="card" style="margin-bottom:24px;"><div class="card-header"><div class="card-title">Persistent Storage</div><span class="badge badge-info">SQLite backend</span></div><div class="card-body" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;"><p style="font-size:13px;color:var(--text-medium);">All changes are stored in savi.db and survive restarts. Reports are computed live from the database.</p><a class="btn btn-secondary" href="{{ url_for('dashboard') }}"><i class="fas fa-chart-pie"></i> Back to Dashboard</a></div></div>
+    <div class="card" style="margin-bottom:24px;{% if settings.maintenance_mode %}border-color:#e6b45c;{% endif %}">
+        <div class="card-header">
+            <div class="card-title"><i class="fas fa-tools" style="color:var(--primary);margin-right:8px;"></i> Maintenance Mode</div>
+            {% if settings.maintenance_mode %}<span class="badge badge-warning"><i class="fas fa-circle-exclamation"></i> Active</span>{% else %}<span class="badge badge-success"><i class="fas fa-check-circle"></i> Off</span>{% endif %}
+        </div>
+        <div class="card-body">
+            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+                <label style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text-medium);cursor:pointer;">
+                    <input type="checkbox" name="maintenance_mode" id="maintenanceToggle" {% if settings.maintenance_mode %}checked{% endif %}>
+                    Enable maintenance mode
+                </label>
+                <span id="maintenanceHint" style="font-size:12.5px;color:#66756c;">While on, the user panel will not work until the admin switches it off.</span>
+            </div>
+            <div id="maintenanceNotice" style="margin-top:12px;{% if not settings.maintenance_mode %}display:none;{% endif %}background:#fff7e6;border:1px solid #f0d9a8;border-radius:10px;padding:12px 14px;font-size:12.5px;color:#8a5b0a;line-height:1.5;">
+                <strong>Heads up:</strong> with maintenance mode ON, the user panel displays the maintenance dialog and will not allow any actions until you uncheck this and save.
+            </div>
+            <div id="maintenanceMessageWrap" style="margin-top:14px;{% if not settings.maintenance_mode %}display:none;{% endif %}">
+                <label class="form-label" for="maintenanceMessage">Maintenance message (shown to users)</label>
+                <textarea id="maintenanceMessage" name="maintenance_message" rows="3" class="form-control" placeholder="e.g. System is under maintenance. We will be back shortly." style="resize:vertical;">{{ settings.maintenance_message }}</textarea>
+                <div style="font-size:12px;color:#66756c;margin-top:6px;"><i class="fas fa-info-circle"></i> This message appears in the user dialog while maintenance mode is active.</div>
+            </div>
+        </div>
+    </div>
+    <div class="card" style="margin-bottom:24px;{% if settings.backup_enabled %}border-color:#bfe0c9;{% endif %}">
+        <div class="card-header">
+            <div class="card-title"><i class="fas fa-cloud-arrow-up" style="color:var(--primary);margin-right:8px;"></i> Daily Backup (Computer + Google Drive)</div>
+            {% if settings.backup_enabled %}<span class="badge badge-success"><i class="fas fa-clock"></i> 12:00 AM &amp; 6:00 PM</span>{% else %}<span class="badge badge-warning"><i class="fas fa-pause"></i> Paused</span>{% endif %}
+        </div>
+        <div class="card-body">
+            <p style="font-size:13px;color:var(--text-medium);margin:0 0 14px;">Every day at 12:00 AM and 6:00 PM the app saves the full company data (Excel, PDF, raw data and a ZIP) on this computer and copies it into your Google Drive synced folder. A backup also runs once when the desktop app opens.</p>
+            <label style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text-medium);cursor:pointer;margin-bottom:16px;">
+                <input type="checkbox" name="backup_enabled" id="backupEnabled" {% if settings.backup_enabled %}checked{% endif %}>
+                Enable automatic backup
+            </label>
+            <div class="form-group">
+                <label class="form-label" for="backupLocalDir">Local backup folder (this computer)</label>
+                <input class="form-control" id="backupLocalDir" name="backup_local_dir" value="{{ settings.backup_local_dir or '' }}" placeholder="{{ default_backup_dir }}">
+                <div style="font-size:12px;color:#66756c;margin-top:6px;"><i class="fas fa-info-circle"></i> Leave empty to use {{ default_backup_dir }}</div>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="backupDriveDir">Google Drive folder (synced by Google Drive for Desktop)</label>
+                <input class="form-control" id="backupDriveDir" name="backup_drive_dir" value="{{ settings.backup_drive_dir or '' }}" placeholder="e.g. G:\My Drive\Savi Nutrition Backups">
+                <div style="font-size:12px;color:#66756c;margin-top:6px;"><i class="fas fa-info-circle"></i> Install and sign in to Google Drive for Desktop first, then choose a folder inside "My Drive". The app copies the backup there and Drive uploads it automatically. Leave empty for computer-only backups.</div>
+            </div>
+            <div class="form-group" style="max-width:240px;">
+                <label class="form-label" for="backupKeepDays">Keep backups for (days)</label>
+                <input class="form-control" id="backupKeepDays" name="backup_keep_days" type="number" min="1" max="3650" step="1" value="{{ settings.backup_keep_days or 30 }}">
+            </div>
+            <div style="background:#f4f8f5;border:1px solid #e2ece4;border-radius:10px;padding:12px 14px;font-size:12.5px;color:#4a5a50;margin-bottom:14px;">
+                <div>Last backup: <strong id="dailyBackupLastRun">{{ settings.backup_last_run or 'Not yet' }}</strong></div>
+                <div id="dailyBackupStatusText" style="margin-top:4px;word-break:break-word;">{{ settings.backup_last_status or 'No backup has been run yet.' }}</div>
+            </div>
+            <button type="button" class="btn btn-secondary" id="runBackupBtn" onclick="runDailyBackup()"><i class="fas fa-play"></i> Backup Now</button>
+        </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:24px;"><a class="btn btn-secondary" href="{{ url_for('dashboard') }}">Cancel</a><button class="btn btn-primary" type="submit"><i class="fas fa-save"></i> Save Settings</button></div>
+</form>
+
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-header">
+        <div class="card-title"><i class="fas fa-database" style="color:var(--primary);margin-right:8px;"></i> Backup &amp; Export Center</div>
+        <span class="badge badge-info">Company safe copy</span>
+    </div>
+    <div class="card-body">
+        <p style="font-size:13px;color:var(--text-medium);margin:0 0 16px;">Download, collect and store the complete company data. Backup downloads one folder (ZIP) with the Excel workbook, the PDF information report and the raw data file — ready to file away.</p>
+        <div class="backup-grid">
+            <div class="backup-option">
+                <div class="bi"><i class="fas fa-box-archive"></i></div>
+                <h4>Full Backup</h4>
+                <p>One folder with everything: Excel data + PDF report + raw data file.</p>
+                <button class="btn btn-primary btn-block" id="backupBtn" onclick="startDownload('backup')"><i class="fas fa-download"></i> Backup Now</button>
+            </div>
+            <div class="backup-option">
+                <div class="bi"><i class="fas fa-file-excel"></i></div>
+                <h4>Export Excel</h4>
+                <p>All details as an Excel workbook — one sheet per register.</p>
+                <button class="btn btn-secondary btn-block" id="excelBtn" onclick="startDownload('excel')"><i class="fas fa-download"></i> Export All Details</button>
+            </div>
+            <div class="backup-option">
+                <div class="bi"><i class="fas fa-file-pdf"></i></div>
+                <h4>Export PDF</h4>
+                <p>Company information report — summary, stock, alerts, purchases.</p>
+                <button class="btn btn-secondary btn-block" id="pdfBtn" onclick="startDownload('pdf')"><i class="fas fa-download"></i> Export PDF</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="backupOverlay">
+  <div class="dl-box">
+    <div id="dlProgress">
+      <h3 id="dlTitle">Preparing Backup…</h3>
+      <p class="dl-sub" id="dlSub">Please wait — do not close this window.</p>
+      <div class="milk-stage">
+        <div class="milk-lid"></div>
+        <div class="milk-neck"></div>
+        <div class="milk-jar">
+          <div class="milk-fill" id="milkFill"><div class="milk-wave"></div></div>
+          <div class="milk-shine"></div>
+          <div class="milk-pct" id="milkPct">0%</div>
+        </div>
+        <div class="milk-shadow"></div>
+      </div>
+      <div class="milk-status" id="milkStatus">Collecting company data…</div>
+      <div class="milk-bar"><div id="milkBarFill"></div></div>
+      <div class="dl-error" id="dlError"></div>
+      <div style="display:flex;gap:10px;justify-content:center;margin-top:16px;">
+        <button class="btn btn-secondary" id="dlRetryBtn" style="display:none;" onclick="retryDownload()">Retry</button>
+        <button class="btn btn-ghost" id="dlCloseBtn" style="display:none;" onclick="closeBackupOverlay()">Close</button>
+      </div>
+    </div>
+    <div class="dl-success" id="dlSuccess">
+      <div class="ok-ring"><i class="fas fa-check"></i></div>
+      <h3>Download Successful</h3>
+      <p class="dl-sub">Your file is collected, stored and ready.</p>
+      <div class="dl-fileinfo" id="dlFileInfo"></div>
+      <button class="btn btn-primary btn-block" onclick="closeBackupOverlay()">Done</button>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('maintenanceToggle').addEventListener('change', (e)=>{
+  const on = e.target.checked;
+  document.getElementById('maintenanceNotice').style.display = on ? 'block' : 'none';
+  document.getElementById('maintenanceMessageWrap').style.display = on ? 'block' : 'none';
+});
+let dlLocked = false;
+let dlKind = 'backup';
+let dlTimer = null;
+const DL_CONF = {
+  backup: {url: '/api/backup', title: 'Preparing Backup…', stages: [[35,'Collecting company data…'],[65,'Building Excel workbook…'],[85,'Building PDF report…'],[96,'Packing backup folder…']]},
+  excel: {url: '/api/export/excel', title: 'Exporting Excel…', stages: [[40,'Collecting company data…'],[80,'Building Excel workbook…'],[96,'Finalising file…']]},
+  pdf: {url: '/api/export/pdf', title: 'Exporting PDF…', stages: [[40,'Collecting company data…'],[80,'Building PDF report…'],[96,'Finalising file…']]}
+};
+
+function setDlProgress(p, label){
+  p = Math.max(0, Math.min(100, Math.round(p)));
+  document.getElementById('milkFill').style.height = p + '%';
+  document.getElementById('milkBarFill').style.width = p + '%';
+  document.getElementById('milkPct').textContent = p + '%';
+  if(label) document.getElementById('milkStatus').textContent = label;
+}
+
+function setDlButtonsEnabled(on){
+  ['backupBtn','excelBtn','pdfBtn'].forEach(id=>{
+    const b = document.getElementById(id);
+    if(b) b.disabled = !on;
+  });
+}
+
+function startDownload(kind){
+  if(dlLocked) return;
+  dlKind = kind;
+  dlLocked = true;
+  setDlButtonsEnabled(false);
+  const conf = DL_CONF[kind];
+  document.getElementById('dlTitle').textContent = conf.title;
+  document.getElementById('dlSub').textContent = 'Please wait — do not close this window.';
+  document.getElementById('dlProgress').style.display = 'block';
+  document.getElementById('dlSuccess').style.display = 'none';
+  document.getElementById('dlError').style.display = 'none';
+  document.getElementById('dlRetryBtn').style.display = 'none';
+  document.getElementById('dlCloseBtn').style.display = 'none';
+  document.getElementById('backupOverlay').classList.add('show');
+  if(window.hidePageLoader) hidePageLoader(); /* leaf is for page loads, not downloads */
+  setDlProgress(0, conf.stages[0][1]);
+
+  /* Milk fills over exactly 1 minute while the file is prepared.
+     The overlay stays locked until the download succeeds. */
+  const DL_DURATION_MS = 60000;
+  const dlStart = Date.now();
+  let dlBlobInfo = null;
+  let dlFetchError = null;
+  let dlFinished = false;
+  let stageIdx = 0;
+  clearInterval(dlTimer);
+  dlTimer = setInterval(()=>{
+    const elapsed = Date.now() - dlStart;
+    const remain = Math.max(0, Math.ceil((DL_DURATION_MS - elapsed) / 1000));
+    document.getElementById('dlSub').textContent =
+      'About ' + remain + 's remaining — do not close this window.';
+    let p = Math.min(99, (elapsed / DL_DURATION_MS) * 100);
+    while(stageIdx < conf.stages.length && p >= conf.stages[stageIdx][0]){
+      stageIdx++;
+    }
+    const label = conf.stages[Math.min(stageIdx, conf.stages.length - 1)][1];
+    setDlProgress(p, label + ' (' + Math.round(p) + '% in ' + (60 - remain) + 's)');
+    if(dlFetchError){
+      clearInterval(dlTimer);
+      const box = document.getElementById('dlError');
+      box.textContent = 'Download failed: ' + dlFetchError;
+      box.style.display = 'block';
+      document.getElementById('dlRetryBtn').style.display = '';
+      document.getElementById('dlCloseBtn').style.display = '';
+      dlLocked = false;
+      setDlButtonsEnabled(true);
+      return;
+    }
+    if(elapsed >= DL_DURATION_MS && dlBlobInfo && !dlFinished){
+      dlFinished = true;
+      finishDownload(dlBlobInfo.blob, dlBlobInfo.name);
+    }
+  }, 150);
+
+  fetch(conf.url)
+    .then(async res=>{
+      if(!res.ok) throw new Error('Server could not build the file (error ' + res.status + ')');
+      const disp = res.headers.get('Content-Disposition') || '';
+      const m = disp.match(/filename="?([^";]+)"?/);
+      const blob = await res.blob();
+      dlBlobInfo = {blob, name: m ? m[1] : 'savi_download'};
+    })
+    .catch(err=>{ dlFetchError = err.message || 'Unknown error'; });
+
+  function finishDownload(blob, name){
+      clearInterval(dlTimer);
+      setDlProgress(100, 'Download successful ✓');
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(()=> window.URL.revokeObjectURL(url), 8000);
+      const kb = (blob.size / 1024).toFixed(1);
+      document.getElementById('dlFileInfo').innerHTML = '<strong>' + name + '</strong><br>' + kb + ' KB • saved to your Downloads folder';
+      setTimeout(()=>{
+        document.getElementById('dlProgress').style.display = 'none';
+        document.getElementById('dlSuccess').style.display = 'block';
+        dlLocked = false;
+        setDlButtonsEnabled(true);
+      }, 650);
+  }
+}
+
+function retryDownload(){
+  document.getElementById('dlError').style.display = 'none';
+  startDownload(dlKind);
+}
+
+function closeBackupOverlay(){
+  if(dlLocked) return; /* cannot leave until the download is successful */
+  document.getElementById('backupOverlay').classList.remove('show');
+}
+
+async function runDailyBackup(){
+  const btn = document.getElementById('runBackupBtn');
+  if(!btn || btn.disabled) return;
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Backing up...';
+  try{
+    const form = new FormData();
+    form.append('backup_local_dir', document.getElementById('backupLocalDir').value);
+    form.append('backup_drive_dir', document.getElementById('backupDriveDir').value);
+    form.append('backup_keep_days', document.getElementById('backupKeepDays').value || '30');
+    form.append('backup_enabled', document.getElementById('backupEnabled').checked ? '1' : '0');
+    const res = await fetch('/api/backup/run', {method: 'POST', body: form});
+    let data = {};
+    try{ data = await res.json(); }catch(e){}
+    if(!res.ok) throw new Error((data && data.error) || ('Server error ' + res.status));
+    const result = (data && data.result) || {};
+    const message = result.message || 'Backup completed.';
+    const lastRun = result.last_run || 'Just now';
+    document.getElementById('dailyBackupLastRun').textContent = lastRun;
+    document.getElementById('dailyBackupStatusText').textContent = message;
+    alert('Backup completed.\n\n' + message);
+  }catch(err){
+    alert('Backup failed: ' + (err.message || err));
+  }finally{
+    btn.disabled = false;
+    btn.innerHTML = original;
+  }
+}
+</script>
+{% endblock %}

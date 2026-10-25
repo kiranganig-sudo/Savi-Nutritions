@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Resource Maintenance - {{ resource_category }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Resource Maintenance</span> <i class="fas fa-chevron-right"></i> <span>{{ resource_category }}</span></div>
+    <h1 class="page-title">{{ resource_category }}</h1>
+    {% if low_stock_only %}<p style="color:var(--text-light);margin-top:5px;">All Raw Materials, Medicines and Chemicals at Critical stock level.</p>{% endif %}
+  </div>
+  <div class="export-actions">
+    <button class="btn btn-secondary" onclick="exportTable('resourceTable','resource_maintenance_export')"><i class="fas fa-download"></i> Export Report</button>
+  </div>
+</div>
+
+<style>
+/* Clear per-row stock status tinting: Good = green, Low = amber,
+   Critical = red. The row colour matches the dashboard slide-graph
+   colours so the same status always reads the same way. */
+.res-legend{display:flex;gap:12px;font-size:11px;color:var(--text-medium);flex-wrap:wrap;align-items:center;margin-left:auto;}
+.res-legend .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:middle;}
+#resourceTable tbody tr.st-row-ok{background:#f1faf3;}
+#resourceTable tbody tr.st-row-ok td:first-child{box-shadow:inset 4px 0 0 #2e9e4f;}
+#resourceTable tbody tr.st-row-low{background:#fff8e9;}
+#resourceTable tbody tr.st-row-low td:first-child{box-shadow:inset 4px 0 0 #f0a51e;}
+#resourceTable tbody tr.st-row-crit{background:#fdeeed;}
+#resourceTable tbody tr.st-row-crit td:first-child{box-shadow:inset 4px 0 0 #e0393c;}
+#resourceTable tbody tr.st-row-ok:hover{background:#e6f6ea;}
+#resourceTable tbody tr.st-row-low:hover{background:#fdf1d9;}
+#resourceTable tbody tr.st-row-crit:hover{background:#fbe3e2;}
+/* Item names carry a LIGHT BLUE chip so the item itself is never confused
+   with its stock status: the status colour lives on the row tint and the
+   status badge, the name is always light blue. */
+#resourceTable .item-chip{display:inline-block;background:#e7f1fa;color:#15599c;border:1px solid #cfe2f3;border-radius:6px;padding:2px 8px;font-weight:700;max-width:100%;word-break:break-word;}
+</style>
+
+<div class="card">
+  <div class="card-header">
+    <div class="filter-bar">
+      <div class="filter-input"><i class="fas fa-search"></i><input id="resourceSearch" type="text" placeholder="Search items..." oninput="filterResources()"></div>
+      <span class="res-legend">
+        <span><span class="dot" style="background:#2e9e4f;"></span>Good</span>
+        <span><span class="dot" style="background:#f0a51e;"></span>Low Stock</span>
+        <span><span class="dot" style="background:#e0393c;"></span>Critical</span>
+      </span>
+    </div>
+  </div>
+  <div class="table-container">
+    <table class="data-table" id="resourceTable">
+      <thead><tr><th>ID</th>{% if low_stock_only %}<th>Group</th>{% endif %}<th>Item</th><th>Category</th><th>Stock</th><th>Status</th><th>Last Update</th></tr></thead>
+      <tbody>
+      {% for item in resources %}
+        <tr class="{% if item.status == 'Good' %}st-row-ok{% elif item.status == 'Low Stock' %}st-row-low{% else %}st-row-crit{% endif %}" data-status="{{ item.status }}">
+          <td><strong>{{ loop.index }}</strong></td>
+          {% if low_stock_only %}<td><strong>{{ item.group }}</strong></td>{% endif %}
+          <td><span class="item-chip">{{ item.name }}</span><div style="font-size:11px;color:var(--text-light);margin-top:3px;">Unit: {{ item.unit }}</div></td>
+          <td>{{ item.category }}</td>
+          <td class="stock-cell"><strong>{{ "{:,}".format(item.closing) }} {{ item.unit }}</strong></td>
+          <td><span class="badge {% if item.status == 'Good' %}badge-success{% elif item.status == 'Low Stock' %}badge-warning{% else %}badge-danger{% endif %}">{{ item.status }}</span></td>
+          <td><div style="font-size:12px;"><i class="fas fa-clock" style="margin-right:5px;"></i>{{ item.last_update }}</div></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if not low_stock_only %}<div class="modal-overlay" id="resourceModal" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.45);align-items:center;justify-content:center;z-index:100;padding:20px;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:520px;padding:22px;">
+    <h3 style="margin:0 0 4px;">Add Resource</h3>
+    <p style="font-size:12px;color:#66756c;margin:0 0 16px;">Saved to SQLite — stock status is calculated automatically. A new item name and its stock accept only 40 characters.</p>
+    <div class="form-group"><label class="form-label">Item name *</label>
+      <select class="form-control" id="resName" onchange="toggleResNew(this)">
+        <option value="" selected disabled>Select item from {{ resource_category|lower }} list</option>
+        {% for item in resources %}
+        <option value="{{ item.name }}" data-closing="{{ item.closing }}" data-unit="{{ item.unit }}">{{ item.name }}</option>
+        {% endfor %}
+        <option value="__new">➕ New item (type name below)</option>
+      </select>
+    </div>
+    <div class="form-group" id="resNewWrap" style="display:none;"><label class="form-label">New item name *</label><input class="form-control" id="resNameNew" placeholder="Type new item name"></div>
+    <div class="form-group"><label class="form-label">Sub category</label><input class="form-control" id="resCategory" placeholder="e.g. Cereal / Energy source"></div>
+    <div class="form-group" id="resOpenWrap" style="display:none;"><label class="form-label">Opening / In-stock (kg) *</label><input class="form-control" id="resOpening" type="number" value="0" min="0"></div>
+    <div class="form-group" id="resExistInfo" style="display:none;"><div style="background:#f5f9f6;border:1px dashed #cfe3d4;border-radius:9px;padding:10px 12px;font-size:12.5px;color:#55605b;"><i class="fas fa-lock" style="margin-right:6px;"></i>Current stock: <strong id="resExistStock">—</strong> — it stays unchanged when you save.</div></div>
+    <div class="form-group"><label class="form-label">Min stock</label><input class="form-control" id="resMin" type="number" value="250" min="0"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+      <button class="btn btn-secondary" onclick="closeModal('resourceModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveResource()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function filterResources(){
+  /* shared engine (main.js): comma-insensitive numbers, multi-word AND,
+     ignores button labels, shows a "No matching records" row + a live count */
+  saviSearchRows('resourceTable','resourceSearch');
+}
+function openResourceModal(){ document.getElementById('resourceModal').style.display='flex'; }
+function toggleResNew(sel){
+  const isNew = sel.value === '__new';
+  document.getElementById('resNewWrap').style.display = isNew ? '' : 'none';
+  document.getElementById('resOpenWrap').style.display = isNew ? '' : 'none';
+  const info = document.getElementById('resExistInfo');
+  if (!isNew && sel.value){
+    const opt = sel.options[sel.selectedIndex];
+    document.getElementById('resExistStock').textContent =
+      (opt.dataset.closing || '0') + ' ' + (opt.dataset.unit || 'kg');
+    info.style.display = '';
+  } else {
+    info.style.display = 'none';
+  }
+}
+async function saveResource(){
+  let name = document.getElementById('resName').value;
+  if(name === '__new') name = document.getElementById('resNameNew').value.trim();
+  const body = {
+    group: "{{ resource_category }}",
+    name: (name || '').trim(),
+    category: document.getElementById('resCategory').value.trim(),
+    min_stock: parseInt(document.getElementById('resMin').value || '250')
+  };
+  if(!body.name){ alert('Pick an item from the list or add a new one.'); return; }
+  /* Shared 40-character input limit (mirrors RESOURCE_FIELD_MAX_CHARS in
+     user/app.py). Over-long values are refused, never silently truncated. */
+  const RES_FIELD_MAX_CHARS = 40;
+  if(body.name.length>RES_FIELD_MAX_CHARS){
+    alert('Item name/Stock value is excessive - only '+RES_FIELD_MAX_CHARS+' characters are allowed (you typed '+body.name.length+').');
+    document.getElementById('resNameNew').focus(); return;
+  }
+  if(!/^[A-Za-z0-9][A-Za-z0-9 %()+.\/&,-]*$/.test(body.name)){
+    alert('Item name allows only letters, numbers, spaces and the characters % - ( ) . / & ,'); return;
+  }
+  if(document.getElementById('resName').value === '__new'){
+    /* brand-new item: initial stock (defaults to 0 kg) */
+    const v = document.getElementById('resOpening').value;
+    if(String(v).length>RES_FIELD_MAX_CHARS){
+      alert('Item name/Stock value is excessive - only '+RES_FIELD_MAX_CHARS+' digits are allowed.');
+      document.getElementById('resOpening').focus(); return;
+    }
+    body.opening = (v === '' || isNaN(Number(v)) || Number(v) < 0) ? 0 : parseInt(Number(v), 10);
+    body.consumed = 0;
+  }
+  /* existing item: no 'opening' key -> server keeps the stored stock untouched */
+  const res = await fetch('/api/resources', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  const data = await res.json();
+  if(!res.ok || !data.success){ alert(data.error || 'Unable to save'); return; }
+  alert('Material saved successfully.');
+  location.reload();
+}
+</script>
+{% endif %}
+{% endblock %}

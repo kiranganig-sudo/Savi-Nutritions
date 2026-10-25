@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}{{ product.name }} - New Machine Production Update{% endblock %}
+{% block content %}
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px;">
+    <div>
+        <div class="breadcrumb">
+            <a href="{{ url_for('dashboard') }}">Home</a>
+            <i class="fas fa-chevron-right"></i>
+            <span>Production Update</span>
+            <i class="fas fa-chevron-right"></i>
+            <span>{{ product.name }}</span>
+            <i class="fas fa-chevron-right"></i>
+            <span>New Machine</span>
+        </div>
+        <h1 class="page-title">{{ product.name }} - New Machine Production Update</h1>
+        <div class="page-subtitle">Enter the consumed quantity and no of batches for each material. Total Output (bags) is calculated automatically.</div>
+    </div>
+    <button type="submit" form="machineProductionForm" class="btn btn-primary" style="margin-top:4px;white-space:nowrap;">Save</button>
+</div>
+
+<form id="machineProductionForm" method="POST" action="{{ url_for('save_machine_production_update', product_name=product.name, machine='new') }}">
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h3 style="margin:0 0 4px;">New Machine</h3>
+            <div style="color:#66756c;font-size:13px;">Edit the Consumed (kg) and No of Batches for each material. Total Output (bags) is calculated automatically at 50 kg per bag.</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;">
+            <a href="{{ url_for('inventory_product', product_name=product.name) }}" class="btn btn-secondary">Back to Production Update</a>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width:60px;">Sl No</th>
+                        <th>Materials</th>
+                        <th style="width:120px;">Quantity</th>
+                        <th style="width:150px;">Consumed (kg)</th>
+                        <th style="width:150px;">No of Batches</th>
+                        <th style="width:150px;">Total Output</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in material_stock %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td><strong>{{ row.material }}</strong></td>
+                        <td><strong>{{ row.new_machine_qty if row.new_machine_qty else '' }} kg</strong></td>
+                        <td>
+                            <input type="number" name="consumed[]" min="0" step="0.01" class="form-control consumed-input"
+                                   value="{{ row.saved_consumed if row.saved_consumed is not none and row.saved_consumed != '' else '' }}"
+                                   placeholder="0.00">
+                        </td>
+                        <td>
+                            <input type="number" name="no_of_batches[]" min="0" step="1" class="form-control batches-input"
+                                   value="{{ row.saved_batches if row.saved_batches is not none and row.saved_batches != '' else '' }}"
+                                   placeholder="0">
+                        </td>
+                        <td><span class="row-output">0</span> bags</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="6"><div class="empty-state"><h3>No materials found</h3></div></td></tr>
+                {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr style="background:#f7f9f7;font-weight:600;">
+                        <td colspan="3" style="text-align:right;">Total</td>
+                        <td id="totalConsumed">0.00</td>
+                        <td id="totalBatches">0</td>
+                        <td id="totalOutput">0 bags</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+</form>
+
+<div class="modal-overlay" id="savedDialog" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.5);align-items:center;justify-content:center;z-index:3000;padding:20px;">
+    <div class="modal" style="background:#fff;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.25);padding:28px;max-width:420px;text-align:center;">
+        <h3 style="margin:0 0 10px;color:#1f4d2e;"><i class="fas fa-check-circle" style="color:#2e8b57;margin-right:8px;"></i>Saved Successfully</h3>
+        <p style="margin:0 0 20px;color:#5a6b60;font-size:14px;">Production update saved. Refresh the page to see the latest data on this page and in the production summary.</p>
+        <button class="btn btn-primary" onclick="closeSavedDialog();" style="width:100%;">OK</button>
+    </div>
+</div>
+
+<script>
+(function(){
+    window.closeSavedDialog = function(){
+        var d = document.getElementById('savedDialog');
+        d.style.display = 'none';
+        document.body.classList.remove('modal-open');
+        var u = new URL(window.location.href);
+        if(u.searchParams.has('saved')){ u.searchParams.delete('saved'); history.replaceState(null, '', u); }
+    };
+    var rows = document.querySelectorAll('.consumed-input');
+    var batchInputs = document.querySelectorAll('.batches-input');
+    var totalConsumedEl = document.getElementById('totalConsumed');
+    var totalBatchesEl = document.getElementById('totalBatches');
+    var totalOutputEl = document.getElementById('totalOutput');
+    function toNum(v){ var n = parseFloat(v); return isNaN(n) ? 0 : n; }
+    function updateCalc(){
+        var totalConsumed = 0;
+        var totalBatches = 0;
+        rows.forEach(function(inp, i){
+            var consumed = Math.max(toNum(inp.value), 0);
+            var batches = Math.max(Math.round(toNum(batchInputs[i].value)), 0);
+            totalConsumed += consumed;
+            totalBatches += batches;
+            var out = rows[i].closest('tr').querySelector('.row-output');
+            out.textContent = (consumed / 50).toFixed(2).replace(/\.?0+$/, '');
+        });
+        totalConsumedEl.textContent = totalConsumed.toFixed(2).replace(/\.?0+$/, '');
+        totalBatchesEl.textContent = totalBatches;
+        totalOutputEl.textContent = (totalConsumed / 50).toFixed(2).replace(/\.?0+$/, '') + ' bags';
+    }
+    rows.forEach(function(inp){ inp.addEventListener('input', updateCalc); });
+    batchInputs.forEach(function(inp){ inp.addEventListener('input', updateCalc); });
+    updateCalc();
+    {% if request.args.get('saved') %}
+    document.getElementById('savedDialog').style.display = 'flex';
+    document.body.classList.add('modal-open');
+    {% endif %}
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Driver Details{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Driver Details</span></div>
+        <h1 class="page-title">Driver Details</h1>
+        <div class="page-subtitle">Driver information entered by the user via Purchase Maintenance. View-only.</div>
+    </div>
+    <div class="export-actions" style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" type="button" onclick="exportTable('driverDetailsTable','driver_details_export')"><i class="fas fa-download"></i> Export</button>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Driver Records</div>
+        <div class="filter-bar">
+            <div class="filter-input"><i class="fas fa-search"></i><input type="text" placeholder="Search driver records..." oninput="searchTable(this,'driverDetailsTable')" aria-label="Search driver records"></div>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="driverDetailsTable">
+            <thead><tr><th>Sl.No</th><th>Driver Name</th><th>Contact Number</th><th>Vehicle Number</th><th>Date of Arrival</th><th>Quantity in Bill</th><th>Actual Quantity</th><th>Invoice Attached File</th><th>Weigment Attached File</th></tr></thead>
+            <tbody>
+            {% for driver in drivers %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td><strong>{{ driver.driver_name or '—' }}</strong></td>
+                    <td>{{ driver.contact_number or '—' }}</td>
+                    <td>{{ driver.vehicle_number or '—' }}</td>
+                    <td>{{ driver.arrival_date or '—' }}</td>
+                    <td>{% if driver.qty_in_bill %}{{ driver.qty_in_bill }}{% else %}—{% endif %}</td>
+                    <td>{% if driver.actual_qty %}{{ driver.actual_qty }}{% else %}—{% endif %}</td>
+                    <td>{% if driver.slip_attachment %}<a href="{{ url_for('admin_driver_slip', filename=driver.slip_attachment) }}" target="_blank" rel="noopener"><i class="fas fa-paperclip"></i> View</a>{% else %}—{% endif %}</td>
+                    <td>{% if driver.weighment_attachment %}<a href="{{ url_for('admin_driver_slip', filename=driver.weighment_attachment) }}" target="_blank" rel="noopener"><i class="fas fa-paperclip"></i> View</a>{% else %}—{% endif %}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="9"><div class="empty-state"><i class="fas fa-truck"></i><h3>No driver records found</h3><p>Once the user saves driver details on the user side, they will appear here.</p></div></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="pagination" style="padding:16px 20px;"><div class="pagination-info">Showing {{ drivers|length }} driver record(s)</div></div>
+</div>
+{% endblock %}

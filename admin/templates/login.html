@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - SAVI Nutrition Admin</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo.png') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    <style>
+      body{margin:0;background:linear-gradient(135deg,#06321c 0%,#0e5c2f 50%,#166534 100%);min-height:100vh;font-family:'Inter',sans-serif;display:flex;align-items:center;justify-content:center;padding:24px;position:relative;overflow:hidden;}
+      .auth-bg{position:fixed;inset:0;z-index:0;pointer-events:none;}
+      .auth-bg span{position:absolute;display:block;border-radius:50%;filter:blur(70px);opacity:.55;}
+      .auth-bg span:nth-child(1){width:360px;height:360px;background:#34d97f;top:-90px;left:-100px;animation:floatBlob 15s ease-in-out infinite;}
+      .auth-bg span:nth-child(2){width:320px;height:320px;background:#124f2e;bottom:-110px;right:-90px;animation:floatBlob 18s ease-in-out infinite;animation-delay:-5s;}
+      .auth-bg span:nth-child(3){width:240px;height:240px;background:#7ce8ab;top:42%;left:58%;opacity:.3;animation:floatBlob 21s ease-in-out infinite;animation-delay:-10s;}
+      .auth-bg span:nth-child(4){width:120px;height:120px;background:#36c17b;top:12%;right:18%;opacity:.4;filter:blur(40px);animation:floatBlob 12s ease-in-out infinite;animation-delay:-3s;}
+      .auth-bg span:nth-child(5){width:90px;height:90px;background:#9cf5c0;bottom:20%;left:12%;opacity:.35;filter:blur(30px);animation:floatBlob 16s ease-in-out infinite;animation-delay:-7s;}
+      @keyframes floatBlob{0%,100%{transform:translate(0,0) scale(1);}33%{transform:translate(55px,-45px) scale(1.15);}66%{transform:translate(-45px,35px) scale(.92);}}
+      .auth-card{position:relative;z-index:1;}
+      .auth-card{background:#fff;border-radius:18px;box-shadow:0 24px 60px rgba(18,60,34,.18);max-width:420px;width:100%;padding:36px 34px;box-sizing:border-box;}
+      .auth-brand{text-align:center;margin-bottom:24px;}
+      .auth-brand img{width:74px;height:auto;border-radius:14px;}
+      .auth-brand h1{margin:12px 0 2px;font-size:22px;color:#123c22;}
+      .auth-brand p{margin:0;font-size:13px;color:#66756c;}
+      .auth-label{display:block;font-size:12.5px;font-weight:600;color:#33433a;margin:14px 0 6px;}
+      .auth-input{width:100%;box-sizing:border-box;padding:11px 13px;border:1px solid #cfd5d1;border-radius:9px;font-size:14px;color:#303734;outline:none;transition:border-color .15s,box-shadow .15s;background:#fbfdfc;}
+      .auth-input:focus{border-color:#1c5c37;box-shadow:0 0 0 3px rgba(28,92,55,.14);}
+      .auth-btn{width:100%;margin-top:20px;padding:12px;border:0;border-radius:9px;background:linear-gradient(135deg,#166534,#0b3d22);color:#fff;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;}
+      .auth-btn:hover{filter:brightness(1.06);}
+      .auth-error{background:#fbecec;color:#b44747;border:1px solid #f3d3d3;border-radius:9px;padding:10px 12px;font-size:12.5px;margin-bottom:6px;}
+      .auth-footer{text-align:center;margin-top:18px;font-size:13px;color:#66756c;}
+      .auth-footer a{color:#1c5c37;font-weight:700;text-decoration:none;}
+      .auth-note{margin-top:16px;padding:11px 13px;background:#f5f9f6;border:1px dashed #cfe3d4;border-radius:9px;font-size:12px;color:#55605b;line-height:1.55;}
+      .auth-notice{background:#e9f7ee;color:#1c7a44;border:1px solid #cdeeda;border-radius:9px;padding:10px 12px;font-size:12.5px;margin-bottom:6px;}
+      .auth-link{display:block;text-align:center;margin-top:12px;font-size:12.5px;}
+      .auth-link a{color:#1c5c37;font-weight:700;text-decoration:none;cursor:pointer;}
+      .auth-link a:hover{text-decoration:underline;}
+      .pw-wrap{position:relative;}
+      .pw-wrap .auth-input{padding-right:42px;}
+      .pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;color:#7b8a81;cursor:pointer;font-size:15px;padding:6px;}
+      .pw-eye:hover{color:#1c5c37;}
+      .fg-btn{width:100%;margin-top:14px;padding:11px;border:1px solid #cfe3d4;border-radius:9px;background:#f5f9f6;color:#1c5c37;font-size:13.5px;font-weight:700;cursor:pointer;}
+      .fg-btn:hover{background:#edf6f0;}
+      .fg-step{font-size:12px;font-weight:700;color:#1c5c37;text-transform:uppercase;letter-spacing:.4px;margin:4px 0 8px;}
+      .fg-msg{font-size:12.5px;padding:9px 11px;border-radius:9px;margin-bottom:8px;line-height:1.5;}
+      .fg-msg.ok{background:#e9f7ee;color:#1c7a44;border:1px solid #cdeeda;}
+      .fg-msg.err{background:#fbecec;color:#b44747;border:1px solid #f3d3d3;}
+      .fg-msg.warn{background:#fff7e8;color:#8a5a00;border:1px solid #f2dfb4;}
+      .fg-contact-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+      .fg-contact-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;font-size:12.5px;font-weight:600;text-decoration:none;border:1px solid #e2c98a;background:#fff;color:#8a5a00;cursor:pointer;}
+      .fg-contact-btn.wa{background:#e9f7ee;color:#1c7a44;border-color:#cdeeda;}
+      .fg-actions{display:flex;gap:8px;margin-top:16px;}
+      .fg-actions button{flex:1;padding:11px;border-radius:9px;font-size:13.5px;font-weight:700;cursor:pointer;}
+      .fg-send{border:0;background:linear-gradient(135deg,#166534,#0b3d22);color:#fff;}
+      .fg-verify{border:0;background:linear-gradient(135deg,#166534,#0b3d22);color:#fff;}
+      .fg-back{border:1px solid #cfd5d1;background:#fff;color:#55605b;}
+      .fg-btn:disabled,.fg-send:disabled,.fg-verify:disabled{opacity:.6;cursor:default;}
+    </style>
+</head>
+<body>
+    <div class="auth-bg"><span></span><span></span><span></span><span></span><span></span></div>
+    <form class="auth-card" method="post" autocomplete="off">
+        <div class="auth-brand">
+            <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Savi Nutrition">
+            <h1>SAVI Nutrition</h1>
+            <p>Admin Panel — Sign in to continue</p>
+        </div>
+        {% if notice %}<div class="auth-notice"><i class="fas fa-check-circle"></i> {{ notice }}</div>{% endif %}
+        {% if error %}<div class="auth-error" id="loginError"><i class="fas fa-exclamation-circle"></i> {{ error }}</div>{% endif %}
+        <div id="loginPane">
+            <label class="auth-label" for="login_id">ID</label>
+            <input class="auth-input" id="login_id" name="login_id" inputmode="numeric" maxlength="6" placeholder="Enter your ID — 6 digits, e.g. 123456" title="Exactly 6 digits (numbers only)" required autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+            <label class="auth-label" for="password">Password</label>
+            <div class="pw-wrap">
+                <input class="auth-input" id="password" name="password" type="password" placeholder="Enter your password" required autocomplete="off">
+                <button class="pw-eye" id="pwEye" type="button" aria-label="Show password"><i class="fas fa-eye"></i></button>
+            </div>
+            <button class="auth-btn" type="submit"><i class="fas fa-sign-in-alt"></i> Login</button>
+            <div class="auth-link"><a id="fgLink">Forgot password?</a></div>
+            <div class="auth-note"><i class="fas fa-user-lock"></i> Only 2 admin members are allowed to log in. If you are an admin, call or connect with a person you know and log in with the Login ID and Password you were given.</div>
+        </div>
+        <div id="forgotPane" hidden>
+            <div class="fg-step">Step 1 — Request a reset code</div>
+            <div id="fgMsg" class="fg-msg" hidden></div>
+            <div id="fgContact" class="fg-msg warn" hidden>
+                <div id="fgContactText"></div>
+                <div class="fg-contact-actions" id="fgContactActions" hidden></div>
+            </div>
+            <label class="auth-label" for="fgId">Admin ID</label>
+            <input class="auth-input" id="fgId" inputmode="numeric" maxlength="6" placeholder="Enter your admin ID — 6 digits" title="Exactly 6 digits (numbers only)" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+            <div class="fg-actions">
+                <button class="fg-send" id="fgSend" type="button"><i class="fas fa-paper-plane"></i> Send reset code</button>
+                <button class="fg-back" id="fgBack1" type="button">Back to login</button>
+            </div>
+            <div id="fgStep2" hidden>
+                <div class="fg-step" style="margin-top:18px;">Step 2 — Enter code &amp; new password</div>
+                <label class="auth-label" for="fgCode">6-digit code</label>
+                <input class="auth-input" id="fgCode" placeholder="Code from the email" inputmode="numeric" autocomplete="one-time-code">
+                <label class="auth-label" for="fgNew">New password</label>
+                <div class="pw-wrap">
+                    <input class="auth-input" id="fgNew" type="password" placeholder="At least 6 characters" minlength="6">
+                    <button class="pw-eye" id="fgEye" type="button" aria-label="Show password"><i class="fas fa-eye"></i></button>
+                </div>
+                <div class="fg-actions">
+                    <button class="fg-verify" id="fgVerify" type="button"><i class="fas fa-key"></i> Change password</button>
+                    <button class="fg-back" id="fgBack2" type="button">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </form>
+    <script>
+    (function(){
+      var B = {{ request.script_root|tojson }};
+      function getJSON(u){ return fetch(B + u, {credentials:'same-origin'}).then(function(r){ return r.json().then(function(j){ return {ok:r.ok, json:j}; }); }); }
+
+      /* Back-button fix: if this login page was restored from the back/forward
+         cache while a session is still alive, go straight to the dashboard. */
+      function bounceIfLoggedIn(){
+        getJSON('/api/auth-state').then(function(r){ if (r.ok && r.json && r.json.logged_in) location.replace(B + '/dashboard'); }).catch(function(){});
+      }
+      window.addEventListener('pageshow', function(e){ if (e.persisted) bounceIfLoggedIn(); });
+      document.addEventListener('DOMContentLoaded', bounceIfLoggedIn);
+
+      function bindEye(btnId, inputId){
+        var eye = document.getElementById(btnId);
+        eye.addEventListener('click', function(){
+          var pw = document.getElementById(inputId);
+          var show = pw.type === 'password';
+          pw.type = show ? 'text' : 'password';
+          eye.innerHTML = show ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+          eye.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+        });
+      }
+      bindEye('pwEye', 'password');
+      bindEye('fgEye', 'fgNew');
+
+      /* The Login ID is matched EXACTLY by the server. Letters and spaces stay
+         in the box and the login is REFUSED — nothing is rewritten into a valid
+         ID (the old digit filter silently turned "12a3456" into "123456"). */
+      function bindExactId(el){
+        if(!el) return;
+        el.addEventListener('input', function(){ this.setCustomValidity(''); });
+      }
+      ['login_id', 'fgId'].forEach(function(id){
+        bindExactId(document.getElementById(id));
+      });
+
+      /* Max 6 digits: the box cannot hold more than 6 characters, AND any
+         attempt to enter a 7th (typed, pasted or autofilled) sets
+         data-overflow, which blocks submission. That second part matters —
+         maxlength ALONE would silently cut "1234567" down to "123456", which
+         is a real account, so the user would log in as someone else without
+         ever seeing their own value. The flag keeps the truncation VISIBLE
+         instead of harmless-looking: the user must clear and retype. */
+      function bindIdCap(el){
+        if(!el) return;
+        var markOverflow = function(){ el.setAttribute('data-overflow', '1'); };
+        el.addEventListener('beforeinput', function(e){
+          var start = this.selectionStart || 0, end = this.selectionEnd || 0;
+          var kept = this.value.length - (end - start);
+          var add = (e.data != null) ? String(e.data).length : 0;
+          if (kept + add > 6) markOverflow();
+        });
+        el.addEventListener('paste', function(e){
+          var txt = '';
+          try { txt = (e.clipboardData || window.clipboardData).getData('text') || ''; } catch(err){}
+          var start = this.selectionStart || 0, end = this.selectionEnd || 0;
+          if (this.value.length - (end - start) + txt.length > 6) markOverflow();
+        });
+        /* Backstop: maxlength only constrains USER edits, so autofill, drag-drop
+           or script could still park more than 6 chars here. Cut anything over 6
+           AND raise the overflow flag, so that cut is never a silent one. */
+        el.addEventListener('input', function(){
+          if (this.value.length > 6){
+            var pos = this.selectionStart;
+            this.value = this.value.slice(0, 6);
+            if (pos != null) this.selectionStart = this.selectionEnd = Math.min(pos, 6);
+            markOverflow();
+          } else if (this.value.length < 6){
+            this.removeAttribute('data-overflow');
+          }
+        });
+      }
+      ['login_id', 'fgId'].forEach(function(id){
+        bindIdCap(document.getElementById(id));
+      });
+      function idOverflow(el){
+        return !!(el && el.getAttribute('data-overflow') === '1');
+      }
+      function idOverflowMsg(){
+        return 'Login ID must be exactly 6 digits. You entered more than 6 — clear the field and type it again.';
+      }
+      /* Browser/password-manager autofill must not fill a valid ID: the box
+         stays readonly until the user actually touches it. */
+      ['login_id', 'password', 'fgId'].forEach(function(id){
+        var el = document.getElementById(id);
+        if(!el) return;
+        el.setAttribute('autocomplete', 'off');
+        el.setAttribute('data-lpignore', 'true');
+        el.readOnly = true;
+        ['focus', 'keydown', 'paste', 'mousedown'].forEach(function(ev){
+          el.addEventListener(ev, function(){ this.readOnly = false; }, {once: true});
+        });
+      });
+      var loginErrorBox = document.getElementById('loginError');
+      function showLoginError(text){
+        if(!loginErrorBox){
+          loginErrorBox = document.createElement('div');
+          loginErrorBox.className = 'auth-error';
+          loginErrorBox.id = 'loginError';
+          var pane = document.getElementById('loginPane');
+          pane.parentNode.insertBefore(loginErrorBox, pane);
+        }
+        loginErrorBox.innerHTML = '<i class="fas fa-exclamation-circle"></i> ';
+        loginErrorBox.appendChild(document.createTextNode(text));
+        loginErrorBox.hidden = false;
+      }
+      document.querySelector('form.auth-card').addEventListener('submit', function(e){
+        /* Only while the login pane is visible (forgot-password Enter must
+           still work). */
+        if(document.getElementById('loginPane').hidden) return;
+        var idEl = document.getElementById('login_id');
+        var raw = (idEl.value || '');
+        if(idOverflow(idEl)){
+          e.preventDefault();
+          showLoginError(idOverflowMsg());
+          idEl.focus();
+        } else if(!/^[0-9]{6}$/.test(raw)){
+          e.preventDefault();
+          showLoginError(raw
+            ? 'Login ID must be exactly 6 digits (numbers only) — it is matched exactly as typed.'
+            : 'Enter your Login ID (6 digits, numbers only).');
+          idEl.focus();
+        }
+      });
+
+      /* Forgot password pane */
+      var loginPane = document.getElementById('loginPane');
+      var forgotPane = document.getElementById('forgotPane');
+      var fgMsg = document.getElementById('fgMsg');
+      var fgContact = document.getElementById('fgContact');
+      var CONTACT_PHONE = {{ (contact_phone or '')|tojson }};
+      function fgShow(kind, text){
+        fgContact.hidden = true;
+        fgMsg.className = 'fg-msg ' + kind;
+        fgMsg.textContent = text;
+        fgMsg.hidden = false;
+      }
+      /* Shown when email OTP is not configured: instead of a dead-end red
+         error, offer Call / WhatsApp to the admin so the password can still
+         be changed. */
+      function fgShowContact(text){
+        fgMsg.hidden = true;
+        document.getElementById('fgContactText').textContent = text;
+        var box = document.getElementById('fgContactActions');
+        box.innerHTML = '';
+        var digits = String(CONTACT_PHONE || '').replace(/\D/g, '');
+        if (digits){
+          var a = document.createElement('a');
+          a.className = 'fg-contact-btn';
+          a.href = 'tel:' + digits;
+          a.innerHTML = '<i class="fas fa-phone"></i> Call admin';
+          var w = document.createElement('a');
+          w.className = 'fg-contact-btn wa';
+          w.href = 'https://wa.me/' + (digits.length === 10 ? '91' + digits : digits);
+          w.target = '_blank';
+          w.rel = 'noopener';
+          w.innerHTML = '<i class="fab fa-whatsapp"></i> WhatsApp';
+          box.appendChild(a);
+          box.appendChild(w);
+          box.hidden = false;
+        } else {
+          box.hidden = true;
+        }
+        fgContact.hidden = false;
+      }
+      function showForgot(){
+        loginPane.hidden = true;
+        forgotPane.hidden = false;
+        fgMsg.hidden = true;
+        fgContact.hidden = true;
+        /* keep Enter inside the forgot inputs from implicitly submitting the
+           (hidden) login form */
+        document.getElementById('login_id').removeAttribute('required');
+        document.getElementById('password').removeAttribute('required');
+        document.getElementById('fgId').focus();
+      }
+      function showLogin(){
+        forgotPane.hidden = true;
+        loginPane.hidden = false;
+        fgMsg.hidden = true;
+        fgContact.hidden = true;
+        document.getElementById('fgStep2').hidden = true;
+        document.getElementById('login_id').setAttribute('required', '');
+        document.getElementById('password').setAttribute('required', '');
+      }
+      ['fgId', 'fgCode', 'fgNew'].forEach(function(id){
+        document.getElementById(id).addEventListener('keydown', function(e){
+          if (e.key === 'Enter'){ e.preventDefault(); }
+        });
+      });
+      document.getElementById('fgLink').addEventListener('click', showForgot);
+      document.getElementById('fgBack1').addEventListener('click', showLogin);
+      document.getElementById('fgBack2').addEventListener('click', showLogin);
+
+      document.getElementById('fgSend').addEventListener('click', function(){
+        var btn = this;
+        var id = (document.getElementById('fgId').value || '').trim();
+        if (!id){ fgShow('err', 'Enter your admin ID first.'); return; }
+        if (idOverflow(document.getElementById('fgId'))){ fgShow('err', idOverflowMsg()); return; }
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+        fetch(B + '/api/auth/forgot/send', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({login_id: id})
+        }).then(function(r){ return r.json().then(function(j){ return {ok:r.ok, json:j}; }); }).then(function(r){
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send reset code';
+          if (r.ok && r.json && r.json.success){
+            fgShow('ok', r.json.message || 'If this admin ID exists, a 6-digit code has been sent.');
+            document.getElementById('fgStep2').hidden = false;
+            document.getElementById('fgCode').focus();
+          } else {
+            var j = r.json || {};
+            if (j.email_not_configured || (j.error && j.error.indexOf('not configured') !== -1)){
+              document.getElementById('fgStep2').hidden = true;
+              fgShowContact('Password reset by email is not switched on for this website yet, so a code cannot be sent. Contact the admin and your password will be changed for you.');
+            } else {
+              fgShow('err', j.error || 'Could not send the code. Please try again.');
+            }
+          }
+        }).catch(function(){
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send reset code';
+          fgShow('err', 'Could not reach the server. Please try again.');
+        });
+      });
+
+      document.getElementById('fgVerify').addEventListener('click', function(){
+        var btn = this;
+        var id = (document.getElementById('fgId').value || '').trim();
+        var code = (document.getElementById('fgCode').value || '').trim();
+        var np = document.getElementById('fgNew').value || '';
+        if (!/^\d{6}$/.test(code)){ fgShow('err', 'Enter the 6-digit code from the email.'); return; }
+        if (np.length < 6){ fgShow('err', 'New password must be at least 6 characters.'); return; }
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking...';
+        fetch(B + '/api/auth/forgot/verify', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({login_id: id, code: code, new_password: np})
+        }).then(function(r){ return r.json().then(function(j){ return {ok:r.ok, json:j}; }); }).then(function(r){
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fas fa-key"></i> Change password';
+          if (r.ok && r.json && r.json.success){
+            location.replace(B + '/login?reset=1');
+          } else {
+            fgShow('err', (r.json && r.json.error) || 'Could not change the password.');
+          }
+        }).catch(function(){
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fas fa-key"></i> Change password';
+          fgShow('err', 'Could not reach the server. Please try again.');
+        });
+      });
+    })();
+    </script>
+</body>
+</html>

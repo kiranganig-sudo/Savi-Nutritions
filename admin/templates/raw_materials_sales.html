@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Raw Materials Sales{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Raw Materials Sales</span></div>
+        <h1 class="page-title">Raw Materials Sales</h1>
+        <div class="page-subtitle">Sales entered by the user side. View-only — closing stock = opening + purchases - consumed - sales.</div>
+    </div>
+    <div class="export-actions" style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" type="button" onclick="exportTable('rmSalesTable','raw_materials_sales_export')"><i class="fas fa-download"></i> Export</button>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Sale Records</div>
+        <div class="filter-bar">
+            <div class="filter-input"><i class="fas fa-search"></i><input type="text" placeholder="Search sales..." oninput="searchTable(this,'rmSalesTable')" aria-label="Search raw material sales"></div>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="rmSalesTable">
+            <thead><tr><th>Sl.No</th><th>Invoice Number</th><th>Customer Name</th><th>Customer Contact Number</th><th>Material</th><th>Actual Quantity</th><th>Quantity in Bill</th><th>Date</th><th>Invoice</th><th>Amount Received (₹)</th><th>Balance Amount (₹)</th><th>Total Amount (₹)</th></tr></thead>
+            <tbody>
+            {% for sale in sales %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ sale.invoice_number or '—' }}</td>
+                    <td><strong>{{ sale.buyer or '—' }}</strong></td>
+                    <td>{{ sale.customer_contact or '—' }}</td>
+                    <td>{{ sale.material }}</td>
+                    <td>{{ sale.quantity }} kg</td>
+                    <td>{{ sale.bill_quantity }} kg</td>
+                    <td><strong>{{ sale.date or '—' }}</strong></td>
+                    <td>{% if sale.invoice_attachment %}<a href="{{ url_for('sales_invoice', filename=sale.invoice_attachment) }}" target="_blank" rel="noopener"><i class="fas fa-paperclip"></i> View</a>{% else %}—{% endif %}</td>
+                    <td>{{ sale.amount }}</td>
+                    <td>{{ sale.balance_amount }}</td>
+                    <td>{{ sale.total_amount }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="12"><div class="empty-state"><i class="fas fa-sack-dollar"></i><h3>No raw material sales yet</h3><p>Sales entered on the user side will appear here.</p></div></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="pagination" style="padding:16px 20px;"><div class="pagination-info">Showing {{ sales|length }} sale record(s)</div></div>
+</div>
+
+{% endblock %}

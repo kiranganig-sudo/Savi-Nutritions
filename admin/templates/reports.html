@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% block content %}
+<style>
+    .reports-layout{display:grid;grid-template-columns:215px minmax(0,1fr);gap:0;margin:-4px -2px 0;min-height:calc(100vh - 110px)}
+    .reports-menu{padding:12px 10px 30px 2px;border-right:1px solid #e4e7e5;background:#fff}
+    .reports-menu-title{font-size:12px;letter-spacing:.08em;color:#7b817e;font-weight:600;padding:4px 14px 12px;text-transform:uppercase}
+    .report-tab{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;text-align:left;padding:11px 14px;border-radius:6px;color:#4d5551;font:500 13px Inter,Arial,sans-serif;cursor:pointer;margin-bottom:3px}
+    .report-tab:hover{background:#f1f6f2}.report-tab.active{background:#e7f5ea;color:#246b35;font-weight:600}.report-tab i{width:15px;text-align:center}
+    .reports-main{padding:8px 18px 28px;min-width:0;background:#f7f8f7}
+    .report-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:6px 0 16px;flex-wrap:wrap}
+    .report-filters{display:flex;align-items:center;gap:18px;flex-wrap:wrap}.report-field{display:flex;align-items:center;gap:8px;font-size:12px;color:#1e2522}.report-field select,.report-field input{height:36px;border:1px solid #cfd5d1;border-radius:5px;background:#fff;padding:0 12px;color:#303734;min-width:120px}.report-field select{min-width:210px}
+    .report-note{font-size:11px;color:#7d837f}.report-panel{display:none}.report-panel.active{display:block}
+    .report-summary{display:grid;grid-template-columns:repeat(4,1fr);background:#fff;border:1px solid #dfe4e1;border-radius:8px;margin-bottom:16px;overflow:hidden}.summary-item{padding:15px 16px;border-right:1px solid #e4e7e5}.summary-item:last-child{border-right:0}.summary-label{font-size:12px;color:#6f7672;margin-bottom:5px}.summary-value{font-size:22px;font-weight:600;color:#1f2723}.summary-note{font-size:11px;color:#929894;margin-top:3px}
+    .report-grid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(220px,.85fr);gap:16px;margin-bottom:16px}.report-card{background:#fff;border:1px solid #dfe4e1;border-radius:8px;overflow:hidden}.report-card-head{padding:16px 18px;border-bottom:1px solid #e7eae8;display:flex;align-items:center;justify-content:space-between;gap:12px}.report-card-title{font-size:15px;font-weight:600;color:#26302b}.report-card-body{padding:15px 18px}.about-copy{font-size:12px;line-height:1.7;color:#68706b}.holdings{display:flex;flex-direction:column;gap:10px}.holding-row{display:grid;grid-template-columns:105px minmax(60px,1fr) 42px;align-items:center;gap:8px;font-size:11px;color:#5e6662}.holding-bar{height:11px;background:#1f6b4b;border-radius:4px;min-width:4px}.report-table-wrap{overflow:auto}.report-table{width:100%;border-collapse:collapse;font-size:12px}.report-table th{background:#fbfcfb;color:#69716c;font-weight:600;text-align:left;padding:10px 12px;border-bottom:1px solid #d8ddd9;white-space:nowrap}.report-table td{padding:11px 12px;border-bottom:1px solid #e5e8e6;color:#39413d;white-space:nowrap}.report-table tr:last-child td{border-bottom:0}.status-dot{font-size:12px;font-weight:500}.status-dot.healthy{color:#287d54}.status-dot.critical{color:#b56a20}.status-dot.low{color:#c18416}.badge-mini{display:inline-block;padding:4px 8px;border-radius:10px;font-size:10px;font-weight:600;background:#eef5ef;color:#2e7044}.badge-mini.warn{background:#fff4e5;color:#a96316}.badge-mini.danger{background:#fbecec;color:#b44747}.report-search{border:1px solid #d3d9d5;border-radius:5px;height:34px;padding:0 10px;min-width:190px}.report-empty{padding:35px;text-align:center;color:#818883;font-size:13px}
+    .purchase-total{font-size:20px;font-weight:600}.movement-in{color:#287d54;font-weight:600}.movement-out{color:#a15d21;font-weight:600}
+    @media(max-width:1050px){.reports-layout{grid-template-columns:175px minmax(0,1fr)}.report-summary{grid-template-columns:repeat(2,1fr)}.report-grid{grid-template-columns:1fr}}
+    @media(max-width:720px){.reports-layout{grid-template-columns:1fr}.reports-menu{border-right:0;border-bottom:1px solid #e4e7e5;display:flex;overflow:auto;gap:4px;padding:8px}.reports-menu-title{display:none}.report-tab{white-space:nowrap;width:auto}.reports-main{padding:8px}.report-summary{grid-template-columns:1fr}.summary-item{border-right:0;border-bottom:1px solid #e4e7e5}.summary-item:last-child{border-bottom:0}.report-toolbar{align-items:flex-start}}
+</style>
+
+<div class="reports-layout">
+    <aside class="reports-menu">
+        <div class="reports-menu-title">Reports</div>
+        <button class="report-tab active" data-report="inventory"><i class="fas fa-boxes-stacked"></i>Product</button>
+        <button class="report-tab" data-report="purchases"><i class="fas fa-file-invoice"></i>Purchases</button>
+        <button class="report-tab" data-report="analysis"><i class="fas fa-magnifying-glass-chart"></i>Material analysis</button>
+        <button class="report-tab" data-report="alerts"><i class="fas fa-triangle-exclamation"></i>Stock alerts</button>
+        <button class="report-tab" data-report="batches"><i class="fas fa-layer-group"></i>Productions</button>
+    </aside>
+
+    <main class="reports-main">
+        <div class="report-toolbar">
+            <div class="report-filters">
+                <div class="report-field"><span>Period</span><select id="monthDisplay" onchange="applyPeriodFilter()">
+                    {% for m in report_months %}<option value="{{ m.value }}" {% if selected_month == m.value %}selected{% endif %}>{{ m.label }}</option>{% endfor %}
+                </select></div>
+                <div class="report-field"><span>Year</span><select id="yearDisplay" onchange="applyPeriodFilter()">
+                    {% for y in report_years %}<option value="{{ y.value }}" {% if selected_year == y.value %}selected{% endif %}>{{ y.label }}</option>{% endfor %}
+                </select></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;"><div class="report-note">This report always shows the position right now</div><button class="btn btn-secondary btn-sm" onclick="exportActiveReport()"><i class="fas fa-download"></i> Export</button></div>
+        </div>
+
+        <section class="report-panel active" id="report-inventory">
+            <div class="report-summary">
+                <div class="summary-item"><div class="summary-label">Products</div><div class="summary-value">{{ total_materials }}</div><div class="summary-note">Products holding stock</div></div>
+                <div class="summary-item"><div class="summary-label">Need attention</div><div class="summary-value">{{ need_attention }}</div><div class="summary-note">low, critical or out</div></div>
+            </div>
+            <div class="report-grid">
+                <div class="report-card"><div class="report-card-head"><div class="report-card-title">Largest holdings (unit)</div></div><div class="report-card-body"><div class="holdings">
+                    {% set max_stock = largest_holdings[0].on_hand if largest_holdings and largest_holdings[0].on_hand else 1 %}
+                    {% for row in largest_holdings %}<div class="holding-row"><span>{{ row.material }}</span><div class="holding-bar" style="width:{{ ((row.on_hand / max_stock) * 100)|round|int if max_stock else 0 }}%;"></div><span>{{ (row.on_hand/1000)|round(1) }}k</span></div>{% endfor %}
+                </div></div></div>
+                <div class="report-card"><div class="report-card-head"><div class="report-card-title">About this report</div></div><div class="report-card-body"><p class="about-copy">This report shows the current stock position of each product in units.</p></div></div>
+            </div>
+            <div class="report-card"><div class="report-card-head"><div class="report-card-title">Inventory position</div><input class="report-search" data-table="inventoryTable" placeholder="Search materials..." oninput="filterReportTable(this)"></div><div class="report-table-wrap"><table class="report-table" id="inventoryTable"><thead><tr><th>Material</th><th>Category</th><th>On hand</th><th>Minimum</th><th>Status</th></tr></thead><tbody>{% for row in inventory_rows %}<tr><td><strong>{{ row.material }}</strong></td><td>{{ row.category }}</td><td>{{ "{:,}".format(row.on_hand) }} {{ row.unit }}</td><td>{{ row.minimum }} {{ row.unit }}</td><td><span class="status-dot {{ 'critical' if row.status == 'Critical' else 'healthy' }}">● {{ row.status }}</span></td></tr>{% endfor %}</tbody></table></div></div>
+        </section>
+
+        <section class="report-panel" id="report-purchases">
+            <div class="report-summary"><div class="summary-item"><div class="summary-label">Purchase value</div><div class="summary-value">₹{{ "{:,.0f}".format(purchase_total) }}</div><div class="summary-note">Recorded purchases</div></div><div class="summary-item"><div class="summary-label">Outstanding</div><div class="summary-value">₹{{ "{:,.0f}".format(outstanding_total) }}</div><div class="summary-note">Amount remaining</div></div><div class="summary-item"><div class="summary-label">Purchase records</div><div class="summary-value">{{ purchase_rows|length }}</div><div class="summary-note">Current records</div></div><div class="summary-item"><div class="summary-label">Paid records</div><div class="summary-value">{{ purchase_rows|selectattr('status','equalto','Paid')|list|length }}</div><div class="summary-note">Fully paid</div></div></div>
+            <div class="report-card"><div class="report-card-head"><div class="report-card-title">Purchases report</div><input class="report-search" data-table="purchaseTable" placeholder="Search purchases..." oninput="filterReportTable(this)"></div><div class="report-table-wrap"><table class="report-table" id="purchaseTable"><thead><tr><th>Invoice #</th><th>Supplier</th><th>Date</th><th>Product</th><th>Quantity</th><th>Amount Paid</th><th>Remaining</th><th>Mode</th><th>Status</th></tr></thead><tbody>{% for p in purchase_rows %}<tr><td><strong>{{ p.invoice }}</strong></td><td>{{ p.supplier }}</td><td>{{ p.date }}</td><td>{{ p.product }}</td><td>{{ p.quantity }}</td><td>₹{{ "{:,.0f}".format(p.amount) }}</td><td>₹{{ "{:,.0f}".format(p.remaining) }}</td><td>{{ p.payment_mode }}</td><td><span class="badge-mini {{ 'danger' if p.status == 'Unpaid' else ('warn' if p.status == 'Partial' else '') }}">{{ p.status }}</span></td></tr>{% endfor %}</tbody></table></div></div>
+        </section>
+
+        <section class="report-panel" id="report-analysis">
+            <div class="report-card"><div class="report-card-head"><div class="report-card-title">Material analysis</div><input class="report-search" data-table="analysisTable" placeholder="Search materials..." oninput="filterReportTable(this)"></div><div class="report-table-wrap"><table class="report-table" id="analysisTable"><thead><tr><th>Material</th><th>Category</th><th>On hand</th><th>Minimum</th><th>Status</th><th>Last update</th></tr></thead><tbody>{% for r in materials %}<tr><td><strong>{{ r.material }}</strong></td><td>{{ r.category }}</td><td>{{ "{:,}".format(r.on_hand) }} {{ r.unit }}</td><td>{{ r.minimum }} {{ r.unit }}</td><td><span class="badge-mini {{ 'danger' if r.status == 'Critical' else ('warn' if r.status == 'Low Stock' else '') }}">{{ r.status }}</span></td><td>{{ r.last_update }}</td></tr>{% endfor %}</tbody></table></div></div>
+        </section>
+
+        <section class="report-panel" id="report-alerts">
+            <div class="report-summary"><div class="summary-item"><div class="summary-label">Items needing attention</div><div class="summary-value">{{ alerts|length }}</div><div class="summary-note">Low stock or critical</div></div><div class="summary-item"><div class="summary-label">Critical</div><div class="summary-value">{{ alerts|selectattr('status','equalto','Critical')|list|length }}</div><div class="summary-note">Immediate attention</div></div></div>
+            <div class="report-card"><div class="report-card-head"><div class="report-card-title">Stock alerts</div><input class="report-search" data-table="alertsTable" placeholder="Search alerts..." oninput="filterReportTable(this)"></div><div class="report-table-wrap"><table class="report-table" id="alertsTable"><thead><tr><th>Material</th><th>Category</th><th>On hand</th><th>Minimum</th><th>Status</th><th>Last update</th></tr></thead><tbody>{% for r in alerts %}<tr><td><strong>{{ r.material }}</strong></td><td>{{ r.category }}</td><td>{{ "{:,}".format(r.on_hand) }} {{ r.unit }}</td><td>{{ r.minimum }} {{ r.unit }}</td><td><span class="badge-mini {{ 'danger' if r.status == 'Critical' else 'warn' }}">{{ r.status }}</span></td><td>{{ r.last_update }}</td></tr>{% else %}<tr><td colspan="6" class="report-empty">No stock alerts found.</td></tr>{% endfor %}</tbody></table></div></div>
+        </section>
+
+        <section class="report-panel" id="report-batches">
+            <div class="report-card"><div class="report-card-head"><div class="report-card-title">Productions</div><input class="report-search" data-table="batchesTable" placeholder="Search productions..." oninput="filterReportTable(this)"></div><div class="report-table-wrap"><table class="report-table" id="batchesTable"><thead><tr><th>Product</th><th>Date</th><th>Shift</th><th>Quantity</th></tr></thead><tbody>{% for r in batches %}<tr><td><strong>{{ r.product }}</strong></td><td>{{ r.date }}</td><td>{{ r.shift }}</td><td>{{ r.quantity }} unit</td></tr>{% endfor %}</tbody></table></div></div>
+        </section>
+    </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function switchReport(name){
+    document.querySelectorAll('.report-tab').forEach(function(btn){btn.classList.toggle('active', btn.dataset.report===name);});
+    document.querySelectorAll('.report-panel').forEach(function(panel){panel.classList.toggle('active', panel.id==='report-'+name);});
+    localStorage.setItem('saviReportTab', name);
+}
+
+document.querySelectorAll('.report-tab').forEach(function(btn){btn.addEventListener('click',function(){switchReport(btn.dataset.report);});});
+
+function filterReportTable(input){
+    /* shared engine (main.js) - comma-insensitive numbers, multi-word AND */
+    saviSearchRows(input.dataset.table, input);
+}
+
+function applyPeriodFilter(){
+    const month=document.getElementById('monthDisplay').value;
+    const year=document.getElementById('yearDisplay').value;
+    const url=new URL(window.location.href); url.searchParams.set('month',month); url.searchParams.set('year',year); window.location.href=url.toString();
+}
+
+function exportActiveReport(){
+    const active=document.querySelector('.report-panel.active');
+    const table=active ? active.querySelector('.report-table') : null;
+    if(!table){ alert('Nothing to export on this tab.'); return; }
+    exportTable(table.id, table.id + '_export');
+}
+
+document.addEventListener('DOMContentLoaded',function(){
+    const saved=localStorage.getItem('saviReportTab');
+    if(saved && document.getElementById('report-'+saved)) switchReport(saved);
+    const global=document.getElementById('globalSearch');
+    if(global){global.addEventListener('input',function(){
+        const active=document.querySelector('.report-panel.active'); if(!active)return;
+        const panel=active;
+        saviSearchRows(panel, global);
+    });}
+});
+</script>
+{% endblock %}

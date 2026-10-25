@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}Logout{% endblock %}
+{% block content %}
+<div class="page-header"><div><div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Logout</span></div><h1 class="page-title">Logout</h1></div></div>
+<div class="card module-placeholder-card"><div class="card-body empty-state"><i class="fas fa-circle-check" style="color:var(--primary);"></i><h2>Demo session ended</h2><p>This browser build has no authentication server, so logout is represented as a safe demo confirmation.</p><a href="{{ url_for('dashboard') }}" class="btn btn-primary"><i class="fas fa-arrow-left"></i> Return to Dashboard</a></div></div>
+{% endblock %}

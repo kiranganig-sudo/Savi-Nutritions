@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Product Sales{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Product Sales</span></div>
+        <h1 class="page-title">Product Sales</h1>
+        <div class="page-subtitle">Sales entered by the user side. View-only — sold quantity is deducted from product stock.</div>
+    </div>
+    <div class="export-actions" style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" type="button" onclick="exportTable('psSalesTable','product_sales_export')"><i class="fas fa-download"></i> Export</button>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Sale Records</div>
+        <div class="filter-bar">
+            <div class="filter-input"><i class="fas fa-search"></i><input type="text" placeholder="Search sales..." oninput="searchTable(this,'psSalesTable')" aria-label="Search product sales"></div>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="psSalesTable">
+            <thead><tr><th>Sl.No</th><th>Invoice Number</th><th>Customer Name</th><th>Customer Contact Number</th><th>Salesman</th><th>Product</th><th>Quantity</th><th>Total Amount (₹)</th><th>Globle Discount</th><th>Amount to be paid (₹)</th><th>Amount Received (₹)</th><th>Balance Amount (₹)</th><th>Location</th></tr></thead>
+            <tbody>
+            {% for sale in sales %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ sale.invoice_number or '—' }}</td>
+                    <td><strong>{{ sale.customer or '—' }}</strong></td>
+                    <td>{{ sale.customer_contact or '—' }}</td>
+                    <td>{{ sale.salesman_name or '—' }}</td>
+                    <td>{{ sale.product }}</td>
+                    <td>{{ sale.quantity }}</td>
+                    <td>{{ sale.total_amount_value }}</td>
+                    <td>{{ sale.discount_display or '—' }}</td>
+                    <td>{{ sale.amount_to_pay }}</td>
+                    <td>{{ sale.amount }}</td>
+                    <td>{{ sale.balance_amount }}</td>
+                    <td>{{ sale.location or '—' }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="13"><div class="empty-state"><i class="fas fa-cart-shopping"></i><h3>No product sales yet</h3><p>Sales entered on the user side will appear here.</p></div></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="pagination" style="padding:16px 20px;"><div class="pagination-info">Showing {{ sales|length }} sale record(s)</div></div>
+</div>
+{% endblock %}

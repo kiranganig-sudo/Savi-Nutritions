@@ -1,0 +1,518 @@
+{% extends "base.html" %}
+{% block title %}{{ product.name }} - Production Update{% endblock %}
+{% block content %}
+<style>
+  .cellnum{width:86px;}
+  .out-cell{font-weight:800;color:var(--primary);}
+</style>
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Production Update</span> <i class="fas fa-chevron-right"></i> <span>{{ product.name }}</span></div>
+        <h1 class="page-title">{{ product.name }}</h1>
+        <div class="page-subtitle">Production summary and date-wise production history for this product. All values are view-only.</div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header">
+        <div>
+            <h3 style="margin:0 0 4px;">Production Summary</h3>
+            <div style="color:#66756c;font-size:13px;">Production update for {{ product.name }} — {{ selected_daily_display }}</div>
+        </div>
+        <span class="badge badge-primary">{{ product.name }}</span>
+    </div>
+    <div class="card-body" style="padding-bottom:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <form method="get" action="{{ url_for('inventory_product', product_name=product.name) }}" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0;">
+                    <input type="hidden" name="shift" value="{{ selected_shift }}">
+                    <label for="productionDate" style="font-size:13px;color:#66756c;font-weight:600;">Production Date:</label>
+                    <input id="productionDate" name="date" type="date" value="{{ selected_daily }}" max="{{ today_str }}" onchange="this.form.submit()" class="form-control" style="width:165px;cursor:pointer;">
+                </form>
+                <a href="{{ url_for('inventory_product_shift', product_name=product.name, shift='morning', date=selected_daily) }}" class="btn {{ 'btn-primary' if selected_shift == 'morning' else 'btn-secondary' }}" style="text-decoration:none;"><i class="fas fa-sun"></i> Morning</a>
+                <a href="{{ url_for('inventory_product_shift', product_name=product.name, shift='night', date=selected_daily) }}" class="btn {{ 'btn-primary' if selected_shift == 'night' else 'btn-secondary' }}" style="text-decoration:none;"><i class="fas fa-moon"></i> Night</a>
+                <span style="display:inline-flex;align-items:center;gap:7px;padding:9px 14px;border:1px solid #dbe6df;border-radius:9px;background:#f7faf8;font-size:12.5px;color:#66756c;font-weight:600;"><i class="fas {{ 'fa-sun' if selected_shift == 'morning' else 'fa-moon' }}" style="color:var(--primary);"></i> Viewing {{ 'Morning' if selected_shift == 'morning' else 'Night' }} shift{% if selected_shift != active_shift %} · active shift is {{ 'Morning' if active_shift == 'morning' else 'Night' }}{% endif %}</span>
+                {% if other_shift_update %}
+                <a href="{{ url_for('inventory_product_shift', product_name=product.name, shift=other_shift_update.shift, date=selected_daily) }}" class="btn btn-sm" style="text-decoration:none;border:1px solid #e0c46a;background:#fff8e6;color:#7a5c00;font-weight:700;" title="The {{ other_shift_update.shift }} shift already has an update for this date - click to switch"><i class="fas fa-exclamation-triangle"></i> {{ 'Night' if other_shift_update.shift == 'night' else 'Morning' }} updated by {{ other_shift_update.supervisor }} — switch</a>
+                {% endif %}
+                <div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border:1px solid #dbe6df;border-radius:9px;background:#f7faf8;">
+                    <span style="font-size:12px;color:#66756c;font-weight:600;">Supervisor</span>
+                    <strong id="adminSupervisor" style="font-size:15px;color:var(--primary);">{{ supervisor_name or '—' }}</strong>
+                    {% if supervisor_note %}
+                    <span id="adminSupervisorNote" style="font-size:11.5px;color:#66756c;font-weight:600;background:#f0f4f1;border:1px solid #dbe6df;border-radius:8px;padding:3px 8px;">{{ supervisor_note }}</span>
+                    {% else %}
+                    <span id="adminSupervisorNote" style="display:none;font-size:11.5px;color:#66756c;font-weight:600;background:#f0f4f1;border:1px solid #dbe6df;border-radius:8px;padding:3px 8px;"></span>
+                    {% endif %}
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border:1px solid #dbe6df;border-radius:9px;background:#f7faf8;">
+                    <span style="font-size:12px;color:#66756c;font-weight:600;">Old Machine Bags</span>
+                    <strong id="adminOldBags" style="font-size:17px;color:var(--primary);">{{ summary_old_machine_bags }}</strong>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border:1px solid #dbe6df;border-radius:9px;background:#f7faf8;">
+                    <span style="font-size:12px;color:#66756c;font-weight:600;">New Machine Bags</span>
+                    <strong id="adminNewBags" style="font-size:17px;color:var(--primary);">{{ summary_new_machine_bags }}</strong>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;padding:9px 14px;border:1px solid #dbe6df;border-radius:9px;background:#f7faf8;">
+                    <span style="font-size:12px;color:#66756c;font-weight:600;">Total Bags</span>
+                    <strong id="adminTotalBags" style="font-size:17px;color:var(--primary);">{{ summary_total_bags }}</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="productionSummaryTable">
+            <thead>
+                <tr>
+                    <th>Sl No</th>
+                    <th>Materials</th>
+                    <th>Opening Stock</th>
+                    <th>Total Consumed</th>
+                    <th>Closing Stock</th>
+                    <th>No of Batches (Old)</th>
+                    <th>No of Batches (New)</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for item in summary_rows %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td><strong>{{ item.material }}</strong></td>
+                <td>{{ item.opening }}</td>
+                <td>{{ item.consumed }}</td>
+                <td><strong>{{ item.closing }}</strong></td>
+                <td>{{ item.old_batches or 0 }}</td>
+                <td>{{ item.new_batches or 0 }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7"><div class="empty-state"><i class="fas fa-calendar-times"></i><h3>No production update for {{ selected_daily_display }}</h3><p>There is no stored production summary for this date.</p></div></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal-overlay" id="pmModal" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.45);align-items:center;justify-content:center;z-index:100;padding:20px;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:560px;padding:22px;">
+    <h3 style="margin:0 0 4px;">Add Raw Material — {{ product.name }}</h3>
+    <p style="font-size:12px;color:#66756c;margin:0 0 16px;">Closing stock and status are calculated automatically.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group"><label class="form-label">Raw material *</label>
+        <select class="form-control" id="pmName" onchange="togglePmNew(this)">
+          <option value="" selected disabled>Select material from list</option>
+          {% for m in all_materials %}
+          <option value="{{ m }}">{{ m }}</option>
+          {% endfor %}
+          <option value="__new">➕ New material (type name below)</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Unit</label><select class="form-control" id="pmUnit"><option>kg</option><option>g</option><option>Ltr</option><option>unit</option><option>bag</option></select></div>
+    </div>
+    <div class="form-group" id="pmNewWrap" style="display:none;"><label class="form-label">New material name *</label><input class="form-control" id="pmNameNew" placeholder="Type new material name"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+      <div class="form-group"><label class="form-label">Opening</label><input class="form-control" id="pmOpening" type="number" value="100" min="0"></div>
+      <div class="form-group"><label class="form-label">Consumed</label><input class="form-control" id="pmConsumed" type="number" value="0" min="0"></div>
+      <div class="form-group"><label class="form-label">Batch</label><input class="form-control" id="pmBatch" placeholder="e.g. SGP-001"></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+      <button class="btn btn-secondary" onclick="closeModal('pmModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="savePm()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="bulkConsumeModal" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.45);align-items:center;justify-content:center;z-index:100;padding:20px;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:640px;padding:22px;max-height:88vh;overflow-y:auto;">
+    <h3 style="margin:0 0 4px;">Add Consumed — {{ product.name }}</h3>
+    <p style="font-size:12px;color:#66756c;margin:0 0 16px;">Change the consumed numbers below. Closing = Opening − Consumed updates live, and saves for all rows at once.</p>
+    <div class="table-container">
+      <table class="data-table">
+        <thead><tr><th>Raw Material</th><th>Opening</th><th>Consumed</th><th>Closing</th></tr></thead>
+        <tbody>
+        {% for item in material_stock %}
+          <tr>
+            <td><strong>{{ item.material }}</strong></td>
+            <td>{{ item.opening }}</td>
+            <td><input class="form-control bulk-consumed" data-id="{{ item.id }}" data-mat="{{ item.material }}" data-opening="{{ item.opening }}" data-close-el="bclose-{{ item.id }}" type="number" min="0" max="{{ item.opening }}" value="{{ item.consumed }}" style="max-width:110px;"></td>
+            <td><strong id="bclose-{{ item.id }}">{{ item.closing }}</strong></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+      <button class="btn btn-secondary" onclick="closeModal('bulkConsumeModal')">Cancel</button>
+      <button class="btn btn-primary" id="bulkSaveBtn" onclick="saveBulkConsumed()">Save Consumed</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="consumePmModal" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.45);align-items:center;justify-content:center;z-index:100;padding:20px;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:440px;padding:22px;">
+    <h3 style="margin:0 0 4px;">Consume Stock</h3>
+    <p style="font-size:12px;color:#66756c;margin:0 0 16px;" id="consumePmSub">Enter the quantity to consume.</p>
+    <div class="form-group"><label class="form-label">Quantity to consume *</label><input class="form-control" id="consumeQty" type="number" min="1" placeholder="e.g. 10"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+      <button class="btn btn-secondary" onclick="closeModal('consumePmModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveConsumePm()">Subtract from Stock</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="editPmModal" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.45);align-items:center;justify-content:center;z-index:100;padding:20px;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:560px;padding:22px;">
+    <h3 style="margin:0 0 4px;">Edit Raw Material — {{ product.name }}</h3>
+    <p style="font-size:12px;color:#66756c;margin:0 0 16px;">Correct a mistaken entry — closing stock and status recalculate on save.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group"><label class="form-label">Raw material *</label><input class="form-control" id="editPmName" placeholder="e.g. Maize"></div>
+      <div class="form-group"><label class="form-label">Unit</label><select class="form-control" id="editPmUnit"><option>kg</option><option>g</option><option>Ltr</option><option>unit</option><option>bag</option></select></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+      <div class="form-group"><label class="form-label">Opening</label><input class="form-control" id="editPmOpening" type="number" min="0"></div>
+      <div class="form-group"><label class="form-label">Consumed</label><input class="form-control" id="editPmConsumed" type="number" min="0"></div>
+      <div class="form-group"><label class="form-label">Batch</label><input class="form-control" id="editPmBatch" placeholder="e.g. SGP-001"></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+      <button class="btn btn-secondary" onclick="closeModal('editPmModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditPm()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const PM_PRODUCT = "{{ product.name }}";
+const toast = {
+  show(msg, ok){
+    const t = document.createElement('div');
+    t.textContent = msg;
+    Object.assign(t.style,{position:'fixed',bottom:'24px',right:'24px',background: ok===false ? '#b44747' : '#134a2c',color:'#fff',padding:'13px 18px',borderRadius:'9px',fontSize:'13px',fontWeight:'600',zIndex:200});
+    document.body.appendChild(t);
+    setTimeout(()=>t.remove(),3200);
+  },
+  success(msg){ this.show(msg, true); },
+  error(msg){ this.show(msg, false); }
+};
+
+function numOf(inp){ const v = parseInt(inp.value); return isNaN(v) || v < 0 ? 0 : v; }
+function pmRecalcRow(rowEl){
+  const openInp = rowEl.querySelector('.pm-open');
+  const consInp = rowEl.querySelector('.pm-consumed');
+  const oldInp = rowEl.querySelector('.pm-old');
+  const newInp = rowEl.querySelector('.pm-new');
+  const closingEl = rowEl.querySelector('.pm-closing');
+  const outputEl = rowEl.querySelector('.pm-output');
+  const opening = numOf(openInp), consumed = numOf(consInp);
+  const closing = Math.max(opening - consumed, 0);
+  const oldB = numOf(oldInp), newB = numOf(newInp);
+  const output = consumed * (oldB + newB);
+  closingEl.textContent = closing;
+  closingEl.style.color = closing < 150 ? '#b44747' : '';
+  outputEl.textContent = output;
+  rowEl.dataset.closing = closing;
+  if(openInp.dataset.init === undefined) openInp.dataset.init = true;
+}
+function pmRecalcTotals(){
+  let sop=0, scon=0, scls=0, sold=0, snew=0, sout=0, cnt=0;
+  document.querySelectorAll('#productMaterialsTable tbody tr[data-id]').forEach(tr=>{
+    const o = numOf(tr.querySelector('.pm-open'));
+    const c = numOf(tr.querySelector('.pm-consumed'));
+    cnt++; sop += o; scon += c; scls += Math.max(o - c, 0);
+    sold += numOf(tr.querySelector('.pm-old'));
+    snew += numOf(tr.querySelector('.pm-new'));
+    sout += c * (numOf(tr.querySelector('.pm-old')) + numOf(tr.querySelector('.pm-new')));
+  });
+  if(!cnt){ return; }
+  document.getElementById('ftOpening').textContent = sop;
+  document.getElementById('ftConsumed').textContent = scon;
+  document.getElementById('ftClosing').textContent = scls;
+  document.getElementById('ftOld').textContent = sold;
+  document.getElementById('ftNew').textContent = snew;
+  document.getElementById('ftOutput').textContent = sout;
+}
+function pmBindRow(rowEl){
+  rowEl.querySelectorAll('.pm-open, .pm-consumed, .pm-old, .pm-new').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      pmRecalcRow(rowEl); pmRecalcTotals();
+    });
+  });
+}
+function pmBindAll(){ document.querySelectorAll('#productMaterialsTable tbody tr[data-id]').forEach(pmBindRow); resolveBatchAuto(); }
+document.addEventListener('DOMContentLoaded', ()=>{ pmBindAll(); });
+
+function rowSnapshot(tr){
+  return {
+    id: parseInt(tr.dataset.id),
+    opening: numOf(tr.querySelector('.pm-open')),
+    consumed: numOf(tr.querySelector('.pm-consumed')),
+    batch: tr.querySelector('.pm-batch').value.trim(),
+    old_batches: numOf(tr.querySelector('.pm-old')),
+    new_batches: numOf(tr.querySelector('.pm-new'))
+  };
+}
+async function updateRow(btn){
+  const tr = btn.closest('tr');
+  tr.style.opacity = .55;
+  try {
+    const res = await fetch('/api/product-materials/' + tr.dataset.id, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(rowSnapshot(tr))});
+    const data = await res.json();
+    if(!res.ok || !data.success) throw new Error(data.error || 'Unable to update');
+    toast.success('Saved: ' + tr.querySelector('td strong').textContent);
+    refreshUndoRedoButtons();
+  } catch(err){
+    toast.error(err.message);
+  } finally {
+    tr.style.opacity = '';
+  }
+}
+async function removeAllRows(){
+  const rows = Array.from(document.querySelectorAll('#productMaterialsTable tbody tr[data-id]'));
+  if(!rows.length){ toast.show('There are no rows to remove', false); return; }
+  if(!confirm('Remove all materials from ' + PM_PRODUCT + '? This cannot be undone from this page.')) return;
+  try {
+    const res = await fetch('/api/product-materials/remove-all', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({product_name: PM_PRODUCT})});
+    const data = await res.json();
+    if(!res.ok || !data.success) throw new Error(data.error || 'Unable to remove all');
+    toast.success('Removed all materials');
+    location.reload();
+  } catch(err){
+    toast.error(err.message);
+  }
+}
+async function updateAllRows(){
+  const items = Array.from(document.querySelectorAll('#productMaterialsTable tbody tr[data-id]')).map(rowSnapshot);
+  const btn = document.getElementById('updateAllBtn');
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
+  try {
+    const res = await fetch('/api/product-materials/bulk', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({product_name: PM_PRODUCT, items: items})});
+    const data = await res.json();
+    if(!res.ok || !data.success) throw new Error(data.error || 'Unable to save');
+    toast.success('Updated ' + data.updated.length + ' rows');
+    refreshUndoRedoButtons();
+  } catch(err){
+    toast.error(err.message);
+  } finally {
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Update All';
+  }
+}
+function resolveBatchAuto(){
+  let maxNum = 0;
+  const re = /\b(\d{3,})\b/;
+  document.querySelectorAll('.pm-batch').forEach(inp=>{
+    if(inp.value.trim()){ const m = inp.value.match(re); if(m) maxNum = Math.max(maxNum, parseInt(m[1])); }
+  });
+  const autoCount = document.querySelectorAll('.pm-batch').length;
+  const autoVal = (maxNum > 0 ? maxNum + autoCount : autoCount).toString().padStart(3, '0');
+  document.querySelectorAll('.pm-batch').forEach(inp=>{
+    if(!inp.value.trim()) inp.value = PM_PRODUCT.match(/\b\w/g).join('').toUpperCase().slice(0,4) + '-' + autoVal + '-' + (parseInt(inp.closest('tr').dataset.id));
+  });
+}
+function setPlaceholderText(){}
+
+async function refreshUndoRedoButtons(){
+  try {
+    const res = await fetch('/api/product-materials/history?product=' + encodeURIComponent(PM_PRODUCT));
+    const data = await res.json();
+    if(data.success){
+      document.getElementById('undoBtn').disabled = !data.undo_count;
+      document.getElementById('redoBtn').disabled = !data.redo_count;
+      return;
+    }
+  } catch(e){}
+  document.getElementById('undoBtn').disabled = true;
+  document.getElementById('redoBtn').disabled = true;
+}
+
+function openPmModal(){ document.getElementById('pmModal').style.display='flex'; }
+function togglePmNew(sel){
+  document.getElementById('pmNewWrap').style.display = sel.value === '__new' ? '' : 'none';
+}
+async function savePm(){
+  let mat = document.getElementById('pmName').value;
+  if(mat === '__new') mat = document.getElementById('pmNameNew').value.trim();
+  const body = {
+    product_name: PM_PRODUCT,
+    material: (mat || '').trim(),
+    unit: document.getElementById('pmUnit').value,
+    opening: parseInt(document.getElementById('pmOpening').value || '0'),
+    consumed: parseInt(document.getElementById('pmConsumed').value || '0'),
+    batch: document.getElementById('pmBatch').value.trim()
+  };
+  if(!body.material){ alert('Raw material name is required'); return; }
+  const res = await fetch('/api/product-materials', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  const data = await res.json();
+  if(!res.ok || !data.success){ alert(data.error || 'Unable to save'); return; }
+  location.reload();
+}
+async function deletePm(id, material){
+  if(!confirm('Delete "' + material + '" from ' + PM_PRODUCT + '?')) return;
+  const res = await fetch('/api/product-materials/' + id, {method:'DELETE'});
+  const data = await res.json();
+  if(!res.ok || !data.success){ alert(data.error || 'Unable to delete'); return; }
+  location.reload();
+}
+let consumePmId = null;
+function openConsumePm(id, material, closing, unit){
+  consumePmId = id;
+  document.getElementById('consumePmSub').textContent = material + ' — available closing stock: ' + closing + ' ' + unit + '. Enter the quantity to subtract.';
+  document.getElementById('consumeQty').value = '';
+  document.getElementById('consumePmModal').style.display = 'flex';
+  setTimeout(()=> document.getElementById('consumeQty').focus(), 100);
+}
+async function saveConsumePm(){
+  const qty = parseInt(document.getElementById('consumeQty').value || '0');
+  if(!qty || qty <= 0){ alert('Enter a quantity above zero.'); return; }
+  const res = await fetch('/api/product-materials/' + consumePmId + '/consume', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({quantity: qty})});
+  const data = await res.json();
+  if(!res.ok || !data.success){ alert(data.error || 'Unable to consume stock'); return; }
+  location.reload();
+}
+function openBulkConsume(){
+  document.querySelectorAll('.bulk-consumed').forEach(inp=>{
+    inp.oninput = ()=> previewBulkRow(inp);
+    previewBulkRow(inp);
+  });
+  document.getElementById('bulkConsumeModal').style.display = 'flex';
+}
+function previewBulkRow(inp){
+  const o = parseInt(inp.dataset.opening || '0');
+  let v = parseInt(inp.value || '0');
+  if(v < 0){ v = 0; inp.value = 0; }
+  if(v > o){ v = o; inp.value = o; }
+  const el = document.getElementById(inp.dataset.closeEl);
+  el.textContent = Math.max(o - v, 0);
+  el.style.color = Math.max(o - v, 0) === 0 ? '#b44747' : '';
+  const mat = (inp.dataset.mat || '').trim();
+  if(mat){
+    const tr = [...document.querySelectorAll('#productionSummaryTable tbody tr')].find(r => {
+      const s = r.querySelector('td:nth-child(2) strong');
+      return s && (s.textContent || '').trim() === mat;
+    });
+    if(tr){
+      if(tr.children[3]) tr.children[3].textContent = v;
+      if(tr.children[4]) tr.children[4].textContent = Math.max(o - v, 0);
+    }
+  }
+}
+async function saveBulkConsumed(){
+  const items = Array.from(document.querySelectorAll('.bulk-consumed')).map(i=>({
+    id: parseInt(i.dataset.id),
+    consumed: parseInt(i.value || '0'),
+    shift_opening: parseInt(i.dataset.opening || '0')
+  }));
+  const btn = document.getElementById('bulkSaveBtn');
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/product-materials/bulk', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({product_name: PM_PRODUCT, items: items, date: {{ selected_daily|tojson }}, shift: {{ selected_shift|tojson }}})});
+    const data = await res.json();
+    if(!res.ok || !data.success) throw new Error(data.error || 'Unable to save');
+    location.reload();
+  } catch(err){
+    btn.disabled = false;
+    alert(err.message);
+  }
+}
+let editPmId = null;
+function openEditPm(id, material, unit, opening, consumed, batch){
+  editPmId = id;
+  document.getElementById('editPmName').value = material;
+  document.getElementById('editPmUnit').value = unit;
+  document.getElementById('editPmOpening').value = opening;
+  document.getElementById('editPmConsumed').value = consumed;
+  document.getElementById('editPmBatch').value = batch;
+  document.getElementById('editPmModal').style.display='flex';
+}
+async function saveEditPm(){
+  const body = {
+    material: document.getElementById('editPmName').value.trim(),
+    unit: document.getElementById('editPmUnit').value,
+    opening: parseInt(document.getElementById('editPmOpening').value || '0'),
+    consumed: parseInt(document.getElementById('editPmConsumed').value || '0'),
+    batch: document.getElementById('editPmBatch').value.trim()
+  };
+  if(!body.material){ alert('Raw material name is required'); return; }
+  const res = await fetch('/api/product-materials/' + editPmId, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  const data = await res.json();
+  if(!res.ok || !data.success){ alert(data.error || 'Unable to update'); return; }
+  location.reload();
+}
+async function undoAction(){
+  const res = await fetch('/api/product-materials/undo', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({product_name: PM_PRODUCT})});
+  const data = await res.json();
+  if(!res.ok || !data.success){ alert(data.error || 'Nothing to undo'); return; }
+  location.reload();
+}
+async function redoAction(){
+  const res = await fetch('/api/product-materials/redo', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({product_name: PM_PRODUCT})});
+  const data = await res.json();
+  if(!res.ok || !data.success){ alert(data.error || 'Nothing to redo'); return; }
+  location.reload();
+}
+</script>
+
+{% if selected_daily == today_str %}
+<script>
+(function(){
+    var prodName = {{ product.name|tojson }};
+    var selectedDate = {{ selected_daily|tojson }};
+    var selectedShift = {{ selected_shift|tojson }};
+    function esc(v){ return String(v == null ? '' : v).replace(/</g, '&lt;'); }
+    var lastRendered = null; /* render-on-change: rebuilding tbody.innerHTML on
+        every 5s tick flashed the whole table ("website is glitchy" report). */
+    function refreshSummary(){
+        fetch('/api/inventory-product/' + encodeURIComponent(prodName) + '?date=' + encodeURIComponent(selectedDate) + '&shift=' + encodeURIComponent(selectedShift))
+        .then(function(r){ if(!r.ok) { throw new Error(r.status); } return r.json(); })
+        .then(function(d){
+            var oB = document.getElementById('adminOldBags');
+            var nB = document.getElementById('adminNewBags');
+            var tB = document.getElementById('adminTotalBags');
+            var sB = document.getElementById('adminSupervisor');
+            if(oB) oB.textContent = String(d.summary_old_machine_bags == null ? '—' : d.summary_old_machine_bags);
+            if(nB) nB.textContent = String(d.summary_new_machine_bags == null ? '—' : d.summary_new_machine_bags);
+            if(tB) tB.textContent = String(d.summary_total_bags == null ? '—' : d.summary_total_bags);
+            if(sB) sB.textContent = (d.supervisor_name || '').trim() ? d.supervisor_name : '—';
+            var sN = document.getElementById('adminSupervisorNote');
+            if(sN){
+                var note = (d.supervisor_note || '').trim();
+                sN.textContent = note;
+                sN.style.display = note ? '' : 'none';
+            }
+            var tbody = document.querySelector('#productionSummaryTable tbody');
+            if(!tbody) return;
+            var bulkModal = document.getElementById('bulkConsumeModal');
+            if(bulkModal && bulkModal.style.display === 'flex') return;
+            var rows = d.summary_rows || [];
+            var html;
+            if(!rows.length){
+                html = '<tr><td colspan="7"><div class="empty-state"><i class="fas fa-calendar-times"></i><h3>No production update for today</h3></div></td></tr>';
+            } else {
+                html = '';
+                for(var i = 0; i < rows.length; i++){
+                    var r = rows[i];
+                    html += '<tr>' +
+                        '<td>' + (i + 1) + '</td>' +
+                        '<td><strong>' + esc(r.material) + '</strong></td>' +
+                        '<td>' + esc(r.opening) + '</td>' +
+                        '<td>' + esc(r.consumed) + '</td>' +
+                        '<td><strong>' + esc(r.closing) + '</strong></td>' +
+                        '<td>' + esc(r.old_batches) + '</td>' +
+                        '<td>' + esc(r.new_batches) + '</td>' +
+                        '</tr>';
+                }
+            }
+            if(html !== lastRendered){
+                lastRendered = html;
+                tbody.innerHTML = html;
+            }
+        }).catch(function(){});
+    }
+    setInterval(refreshSummary, 5000);
+    refreshSummary();
+})();
+</script>
+{% endif %}
+
+<div style="margin-top:12px;color:#7b8780;font-size:12px;">
+    * Values are read from the user's Production Update. Each shift records its own opening/consumed/closing; opening stock rolls forward from the previous shift (morning closing → night opening → next morning opening).
+</div>
+{% endblock %}

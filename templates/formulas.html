@@ -1,0 +1,505 @@
+{% extends "base.html" %}
+{% block title %}Production Formula{% endblock %}
+{% block content %}
+<style>
+  .formula-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;justify-content:flex-end;position:relative;}
+  .formula-dropdown{position:relative;z-index:20;}
+  .formula-dropdown-menu{display:block;position:absolute;top:calc(100% + 6px);left:0;min-width:290px;max-width:min(360px,calc(100vw - 24px));max-height:70vh;overflow-y:auto;background:#fff;border:1px solid #dfe7e2;border-radius:10px;box-shadow:0 12px 30px -10px rgba(15,61,36,.25);z-index:2100;padding:8px;opacity:0;visibility:hidden;transform:translateY(-6px);transition:opacity .18s ease,transform .18s ease,visibility .18s;}
+  .formula-dropdown.open .formula-dropdown-menu{opacity:1;visibility:visible;transform:translateY(0);}
+  .formula-dropdown-menu .dropdown-title{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 12px 10px;font-weight:700;color:#1f3b2b;border-bottom:1px solid #edf1ee;margin:0;background:#fff;border-radius:9px 9px 0 0;}
+  .formula-dropdown-menu .dropdown-title .drawer-close{background:none;border:none;font-size:19px;line-height:1;color:#66756c;cursor:pointer;padding:4px 7px;border-radius:6px;}
+  .formula-dropdown-menu .dropdown-title .drawer-close:hover{background:#eef7f1;color:#1f3b2b;}
+  .formula-option{display:block;width:100%;border:0;background:#fff;text-align:left;padding:10px 12px;border-radius:7px;cursor:pointer;font-size:13px;color:#26352d;margin:2px 0 0;box-sizing:border-box;}
+  .formula-option:hover{background:#eef7f1;}
+  .formula-option.disabled{color:#125c33;background:#f0faf3;cursor:not-allowed;font-weight:600;display:flex;align-items:center;gap:0;}
+  .formula-option .opt-tick{display:none;flex-shrink:0;width:17px;height:17px;border-radius:50%;background:#16a34a;color:#fff;font-size:9px;line-height:17px;text-align:center;margin-right:8px;}
+  .formula-option.disabled .opt-tick{display:inline-block;}
+  .formula-option.disabled:hover{background:#e4f5ea;}
+  .formula-option.st-critical{background:#fdecec;color:#b42318;box-shadow:inset 3px 0 0 #d92d20;font-weight:600;}
+  .formula-option.st-low{background:#fff6e8;color:#b54708;box-shadow:inset 3px 0 0 #f79009;font-weight:600;}
+  .formula-option.st-critical:hover{background:#fbdedb;}
+  .formula-option.st-low:hover{background:#ffefdb;}
+  .formula-option.st-critical.disabled,.formula-option.st-low.disabled{font-weight:600;}
+  .selected-materials{font-size:12px;color:#66756c;margin-top:6px;}
+.btn-publish{background:#0d6efd;color:#fff;border-color:#0d6efd;}
+.btn-publish:hover{background:#0b5ed7;border-color:#0a58ca;color:#fff;}
+.btn-publish.published{background:#198754;border-color:#198754;}
+.btn-publish.published:hover{background:#157347;border-color:#146c43;}
+.btn-publish:disabled{opacity:0.5;cursor:not-allowed;}
+.btn-publish:disabled:hover{background:inherit;}
+</style>
+
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Production Formula</span> <i class="fas fa-chevron-right"></i> <span>{{ selected_list }}</span></div>
+        <h1 class="page-title">Production Formula — {{ selected_list }}</h1>
+        <div class="page-subtitle">Select Raw Materials, Chemicals or Medicines from the dropdowns to add them to this product formula. Old Machine automatically doubles into New Machine.</div>
+    </div>
+    <div class="formula-toolbar">
+        {% set category_labels = {'Raw Materials': 'add raw materials', 'Chemicals': 'add chemicals', 'Medicines': 'add medicines'} %}
+        {% for category, items in formula_categories.items() %}
+        <div class="formula-dropdown" data-category="{{ category }}">
+            <button class="btn btn-secondary category-toggle" type="button"><i class="fas fa-chevron-down"></i> {{ category_labels.get(category, category) }} ({{ items|length }})</button>
+            <div class="formula-dropdown-menu">
+                <div class="dropdown-title"><span>{{ category_labels.get(category, category) }} ({{ items|length }})</span><button class="drawer-close" type="button" title="Close" onclick="event.stopPropagation(); this.closest('.formula-dropdown').classList.remove('open');">&times;</button></div>
+                {% for item in items %}
+                {% set item_status = formula_statuses.get(item, '') %}
+                <button class="formula-option{% if item_status == 'Critical' %} st-critical{% elif item_status == 'Low Stock' %} st-low{% endif %}" type="button" data-material="{{ item }}"{% if item_status %} title="{{ item_status }} — {{ item }}"{% endif %}><span class="opt-tick"><i class="fas fa-check"></i></span>{{ item }}</button>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+        <button class="btn btn-success" type="button" id="saveAllBtn"><i class="fas fa-save"></i> Save</button>
+        <button class="btn btn-danger" type="button" onclick="clearAllFormula()" id="clearAllBtn" title="Remove every material from this product formula"><i class="fas fa-trash-can"></i> Clear All</button>
+        <button class="btn btn-publish{% if publish_initial %} published{% endif %}" type="button" id="publishBtn"{% if not publish_initial %} disabled{% endif %} title="{% if publish_initial %}Currently published — click to unpublish{% else %}Publish this formula so it shows on the user side{% endif %}"><i class="fas fa-globe"></i> {% if publish_initial %}Published{% else %}Publish{% endif %}</button>
+        <button class="btn btn-secondary" type="button" onclick="exportProductionFormula()"><i class="fas fa-download"></i> Export Excel</button>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-header">
+        <div class="card-title"><i class="fas fa-flask" style="color:var(--primary);margin-right:8px;"></i> Formula Items <span class="badge badge-primary" id="itemCount">{{ sheet_rows|length }} items</span></div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="sheetTable">
+            <thead><tr><th>Sl.No</th><th>Materials</th><th>Old Machine</th><th>New Machine</th><th>Remove</th></tr></thead>
+            <tbody id="formulaBody">
+            {% for r in sheet_rows %}
+                <tr data-material="{{ r.material }}" data-category="{{ r.category }}">
+                    <td class="serial-no">{{ loop.index }}</td>
+                    <td><strong>{{ r.material }}</strong></td>
+                    <td><input type="number" min="0" class="cellnum old-input" data-material="{{ r.material }}" value="{{ r.old_machine }}"></td>
+                    <td><input type="number" min="0" class="cellnum new-input" data-material="{{ r.material }}" value="{{ r.new_machine }}"></td>
+                    <td><button class="btn btn-danger btn-sm remove-btn" type="button" data-material="{{ r.material }}" title="Remove"><i class="fas fa-trash"></i></button></td>
+                </tr>
+            {% else %}
+                <tr id="emptyFormulaRow"><td colspan="5"><div class="empty-state"><i class="fas fa-flask"></i><h3>No items added yet</h3><p>Choose an item from Raw Materials, Chemicals or Medicines above.</p></div></td></tr>
+            {% endfor %}
+            </tbody>
+            <tfoot><tr>
+                <td colspan="2"><strong>Total</strong></td>
+                <td><strong id="totOld">{{ sheet_total_old }}</strong></td>
+                <td><strong id="totNew">{{ sheet_total_new }}</strong></td>
+                <td></td>
+            </tr></tfoot>
+        </table>
+    </div>
+</div>
+
+<div class="modal-overlay" id="thirdModal" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.45);align-items:center;justify-content:center;z-index:100;padding:20px;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:600px;padding:22px;max-height:88vh;overflow-y:auto;">
+    <h3 style="margin:0 0 4px;">Add 3rd Party Item</h3>
+    <p style="font-size:12px;color:#66756c;margin:0 0 16px;">Items sourced from outside parties.</p>
+    <div class="form-group"><label class="form-label">Item Name *</label><input class="form-control" id="thirdName" placeholder="Item name"></div>
+    <div class="form-group"><label class="form-label">Materials *</label>
+      <div id="thirdLines"></div>
+      <button class="btn btn-secondary btn-sm" type="button" onclick="addThirdLine()"><i class="fas fa-plus"></i> Add Material</button>
+    </div>
+    <div class="form-group"><label class="form-label">Price (₹)</label><input class="form-control" id="thirdPrice" type="number" min="0" value="0"></div>
+<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+       <button class="btn btn-secondary" onclick="closeModal('thirdModal')">Cancel</button>
+       <button class="btn btn-publish{% if publish_initial %} published{% endif %}" id="thirdPublishBtn"{% if not publish_initial %} disabled{% endif %}><i class="fas fa-globe"></i> {% if publish_initial %}Published{% else %}Publish{% endif %}</button>
+       <button class="btn btn-primary" id="thirdSaveBtn" onclick="saveThird()">Save Item</button>
+     </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="thirdViewModal" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.45);align-items:center;justify-content:center;z-index:100;padding:20px;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:520px;padding:22px;max-height:88vh;overflow-y:auto;">
+    <h3 style="margin:0 0 4px;" id="thirdViewTitle">3rd Party Item</h3>
+    <p style="font-size:12px;color:#66756c;margin:0 0 16px;" id="thirdViewSub"></p>
+    <div class="table-container"><table class="data-table"><thead><tr><th>Sl.No</th><th>Material</th><th>Opening</th></tr></thead><tbody id="thirdViewBody"></tbody></table></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+      <button class="btn btn-secondary" onclick="closeModal('thirdViewModal')">Back</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="publishDoneModal" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.45);align-items:center;justify-content:center;z-index:100;padding:20px;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:430px;padding:26px;text-align:center;">
+    <div style="width:58px;height:58px;border-radius:50%;background:#e8f3ec;color:#16a34a;font-size:26px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;"><i class="fas fa-check"></i></div>
+    <h3 style="margin:0 0 6px;">Formula is saved and published</h3>
+    <p style="font-size:13.5px;color:#66756c;margin:0 0 20px;">{{ selected_list }} is now visible on the user side.</p>
+    <button class="btn btn-primary" onclick="closeModal('publishDoneModal')" style="min-width:120px;">OK</button>
+  </div>
+</div>
+
+<script>
+const SHEET_PRODUCT = "{{ selected_list }}";
+const SHEET_SECTION = "All";
+const THIRD = {{ third_party|tojson }};
+// Live publish state of THIS product, kept in sync by updatePublishBtn() /
+// updateThirdPublishBtn(). Save publishes the formula, so it must know whether
+// the publish endpoint still needs to be called (it is a blind toggle - calling
+// it while already published would UNpublish the product).
+let SHEET_PUBLISHED = {{ 'true' if publish_initial else 'false' }};
+function showSheetToast(msg, ok){
+  const t = document.createElement('div');
+  t.textContent = msg;
+  Object.assign(t.style, {position:'fixed', bottom:'24px', right:'24px', zIndex:3000,
+    background: ok === false ? '#b44747' : '#134a2c', color:'#fff',
+    padding:'13px 18px', borderRadius:'9px', fontSize:'13px', fontWeight:'600'});
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 2600);
+}
+function sheetTotals(old, newv){
+  document.getElementById('totOld').textContent = old;
+  document.getElementById('totNew').textContent = newv;
+}
+function formulaRows(){
+  return Array.from(document.querySelectorAll('#sheetTable tbody tr[data-material]')).map(row=>({
+    material: row.dataset.material,
+    category: row.dataset.category,
+    old_machine: parseFloat(row.querySelector('.old-input').value || '0'),
+    new_machine: parseFloat(row.querySelector('.new-input').value || '0')
+  }));
+}
+function refreshRowNumbers(){
+  const rows = document.querySelectorAll('#sheetTable tbody tr[data-material]');
+  rows.forEach((row,i)=>row.querySelector('.serial-no').textContent=i+1);
+  document.getElementById('itemCount').textContent = rows.length + ' items';
+  if(!rows.length && !document.getElementById('emptyFormulaRow')){
+    const tr=document.createElement('tr');
+    tr.id='emptyFormulaRow';
+    tr.innerHTML='<td colspan="5"><div class="empty-state"><i class="fas fa-flask"></i><h3>No items added yet</h3><p>Choose an item from Raw Materials, Chemicals or Medicines above.</p></div></td>';
+    document.querySelector('#sheetTable tbody').appendChild(tr);
+  }
+  const empty = document.getElementById('emptyFormulaRow');
+  if(empty) empty.style.display = rows.length ? 'none' : '';
+}
+function recalcTotals(){
+  let oldTotal=0,newTotal=0;
+  formulaRows().forEach(r=>{ oldTotal += r.old_machine || 0; newTotal += r.new_machine || 0; });
+  sheetTotals(oldTotal,newTotal);
+  updateSaveBtn();
+}
+// Save stays greyed out until every row has both a Old Machine and a New
+// Machine quantity (user request: "the save option will be enable" only after
+// the quantities are entered).
+function updateSaveBtn(){
+  const btn=document.getElementById('saveAllBtn');
+  if(!btn) return;
+  const rows=formulaRows();
+  const filled=rows.length>0 && rows.every(r=>parseFloat(r.old_machine)>0 && parseFloat(r.new_machine)>0);
+  btn.disabled=!filled;
+  btn.title = filled
+    ? 'Save this formula (it will also be published)'
+    : (!rows.length ? 'Add at least one item first'
+                    : 'Enter the quantity for both machines on every item first');
+}
+function addFormulaRow(material, category){
+  if(document.querySelector(`#sheetTable tbody tr[data-material="${CSS.escape(material)}"][data-category="${CSS.escape(category)}"]`)){
+    showSheetToast(material + ' is already added');
+    return;
+  }
+  const empty=document.getElementById('emptyFormulaRow');
+  if(empty) empty.remove();
+  const row=document.createElement('tr');
+  row.dataset.material=material; row.dataset.category=category;
+  row.innerHTML = `<td class="serial-no"></td><td><strong>${escapeHtml(material)}</strong><div class="selected-materials">${escapeHtml(category)}</div></td>`
+    + `<td><input type="number" min="0" class="cellnum old-input" value="0"></td>`
+    + `<td><input type="number" min="0" class="cellnum new-input" value="0"></td>`
+    + `<td><button class="btn btn-danger btn-sm remove-btn" type="button" title="Remove"><i class="fas fa-trash"></i></button></td>`;
+  document.querySelector('#sheetTable tbody').appendChild(row);
+  bindFormulaRow(row);
+  refreshRowNumbers();
+  recalcTotals();
+  showSheetToast(material + ' added');
+}
+function escapeHtml(value){
+  return String(value).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+}
+function bindFormulaRow(row){
+  const oldInput=row.querySelector('.old-input');
+  const newInput=row.querySelector('.new-input');
+  oldInput.addEventListener('input',()=>{
+    const v=parseFloat(oldInput.value || '0');
+    if(!isNaN(v)) newInput.value=v*2;
+    recalcTotals();
+  });
+  newInput.addEventListener('input',recalcTotals);
+  row.querySelector('.remove-btn').addEventListener('click',()=>{
+    const material=row.dataset.material, category=row.dataset.category;
+    if(!confirm('Remove "'+material+'" from this product formula?')) return;
+    // Client-only until Save: nothing leaves the database before the formula
+    // is saved, so a reload always shows exactly what was last saved.
+    row.remove(); refreshRowNumbers(); recalcTotals();
+    showSheetToast(material + ' removed (save to keep this change)');
+    document.querySelectorAll('.formula-option').forEach(o=>{ if(o.dataset.material===material && o.closest('.formula-dropdown')?.dataset.category===category) o.classList.remove('disabled'); });
+  });
+}
+document.querySelectorAll('#sheetTable tbody tr[data-material]').forEach(bindFormulaRow);
+refreshRowNumbers();
+recalcTotals();
+
+// Category dropdowns: clicking Raw Materials/Chemicals/Medicines opens the exact item list.
+document.querySelectorAll('.category-toggle').forEach(btn=>{
+  btn.addEventListener('click',e=>{
+    e.stopPropagation();
+    const parent=btn.closest('.formula-dropdown');
+    document.querySelectorAll('.formula-dropdown').forEach(d=>{if(d!==parent)d.classList.remove('open');});
+    parent.classList.toggle('open');
+  });
+});
+document.addEventListener('click',()=>document.querySelectorAll('.formula-dropdown').forEach(d=>d.classList.remove('open')));
+document.querySelectorAll('.formula-option').forEach(option=>{
+  option.addEventListener('click',e=>{
+    e.stopPropagation();
+    if(option.classList.contains('disabled')) return;
+    const category=option.closest('.formula-dropdown').dataset.category;
+    const material=option.dataset.material;
+    if(option.classList.contains('st-critical')){
+      alert('This item is critical in stock so you can not add to formula');
+      return;
+    }
+    // Client-only until Save (the critical-stock guard above still applies;
+    // the server re-checks everything on Save).
+    addFormulaRow(material,category);
+    option.classList.add('disabled');
+  });
+});
+
+// Mark items already in the current formula as unavailable in their dropdown.
+formulaRows().forEach(r=>{
+  document.querySelectorAll('.formula-dropdown').forEach(d=>{
+    if(d.dataset.category===r.category){
+      const o=d.querySelector(`.formula-option[data-material="${CSS.escape(r.material)}"]`);
+      if(o)o.classList.add('disabled');
+    }
+  });
+});
+
+document.getElementById('saveAllBtn').addEventListener('click',async()=>{
+  const btn=document.getElementById('saveAllBtn');
+  const rows=formulaRows();
+  if(!rows.length){
+    showSheetToast('Add at least one item before saving', false);
+    return;
+  }
+  const incomplete=rows.filter(r=>!(parseFloat(r.old_machine)>0) || !(parseFloat(r.new_machine)>0));
+  if(incomplete.length){
+    showSheetToast('Enter quantity for all items before saving', false);
+    return;
+  }
+  btn.disabled=true;
+  try{
+    const res=await fetch('/api/formula-sheet',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:SHEET_PRODUCT, rows:rows, replace:true})});
+    const data=await res.json();
+    if(!res.ok || !data.success) throw new Error(data.error || 'Unable to save');
+    // Saving publishes the formula too, so it is live on the user side.
+    if(!SHEET_PUBLISHED){
+      const pub=await publishFormula();
+      if(!pub.ok) throw new Error(pub.error || 'Publish failed');
+      updatePublishBtn(pub.published);
+      updateThirdPublishBtn(pub.published);
+    }
+    enablePublishBtn();
+    if(SHEET_PUBLISHED) showPublishedDialog();
+    else showSheetToast('Formula saved');
+  }catch(err){showSheetToast(err.message,false);}
+  btn.disabled=false;
+  updateSaveBtn();
+});
+
+async function clearAllFormula(){
+  if(!formulaRows().length){ showSheetToast('No formula items to clear', false); return; }
+  if(!confirm('Remove ALL materials from "' + SHEET_PRODUCT + '" formula? This cannot be undone.')) return;
+  document.querySelectorAll('#sheetTable tbody tr[data-material]').forEach(row=>row.remove());
+  document.querySelectorAll('.formula-option').forEach(o=>o.classList.remove('disabled'));
+  if(!document.getElementById('emptyFormulaRow')){
+    const tbody=document.querySelector('#sheetTable tbody');
+    const tr=document.createElement('tr');
+    tr.id='emptyFormulaRow';
+    tr.innerHTML='<td colspan="5"><div class="empty-state"><i class="fas fa-flask"></i><h3>No items added yet</h3><p>Choose an item from Raw Materials, Chemicals or Medicines above.</p></div></td>';
+    tbody.appendChild(tr);
+  }else{
+    document.getElementById('emptyFormulaRow').style.display='';
+  }
+  refreshRowNumbers();
+  recalcTotals();
+  showSheetToast('Cleared ' + SHEET_PRODUCT + ' formula (save to keep this change)');
+}
+
+function openThirdModal(){
+  document.getElementById('thirdName').value = '';
+  document.getElementById('thirdPrice').value = 0;
+  document.getElementById('thirdLines').innerHTML = '';
+  addThirdLine(); addThirdLine();
+  document.getElementById('thirdModal').style.display = 'flex';
+}
+function addThirdLine(){
+  const wrap = document.getElementById('thirdLines');
+  const row = document.createElement('div');
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 140px 40px;gap:8px;margin-bottom:8px;';
+  row.innerHTML = '<input class="form-control third-mat" placeholder="Material">'
+    + '<input class="form-control third-open" type="number" min="0" placeholder="Opening">'
+    + '<button class="btn btn-secondary btn-sm" type="button" onclick="this.parentElement.remove()">✕</button>';
+  wrap.appendChild(row);
+}
+async function saveThird(){
+  const mats = Array.from(document.querySelectorAll('#thirdLines > div')).map(r=>({
+    material: r.querySelector('.third-mat').value.trim(),
+    opening: parseFloat(r.querySelector('.third-open').value || '0')
+  })).filter(x=>x.material);
+  const body = {
+    name: document.getElementById('thirdName').value.trim(),
+    materials: mats,
+    price: parseFloat(document.getElementById('thirdPrice').value || '0')
+  };
+  if(!body.name){ alert('Item name is required'); return; }
+  if(!mats.length){ alert('Add at least one material'); return; }
+  const btn = document.getElementById('thirdSaveBtn');
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/third-party-items', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    const data = await res.json();
+    if(!res.ok || !data.success) throw new Error(data.error || 'Unable to save');
+    openNewItemDialog();
+  } catch(err){ btn.disabled = false; alert(err.message); }
+}
+function viewThird(id){
+  const t = THIRD.find(x=>x.id === id);
+  if(!t) return;
+  document.getElementById('thirdViewTitle').textContent = t.name;
+  document.getElementById('thirdViewSub').textContent = t.materials_count + ' materials • Price ₹' + t.price;
+  document.getElementById('thirdViewBody').innerHTML = t.materials.map((l,i)=>'<tr><td>' + (i+1) + '</td><td><strong>' + l.material + '</strong></td><td>' + l.opening + '</td></tr>').join('');
+  document.getElementById('thirdViewModal').style.display = 'flex';
+}
+async function deleteThird(id, name){
+  if(!confirm('Delete 3rd party item "' + name + '"?')) return;
+  const res = await fetch('/api/third-party-items/' + id, {method:'DELETE'});
+  const data = await res.json();
+  if(!res.ok || !data.success){ alert(data.error || 'Unable to delete'); return; }
+  location.reload();
+}
+
+// ---- Publish functionality ----
+const PRODUCT_NAME = "{{ selected_list }}";
+const IS_THIRD_PARTY = {{ (selected_list in third_names)|lower }};
+const THIRD_NAMES = {{ third_names|tojson|default('[]') }};
+
+async function loadPublishState(){
+  try{
+    let pub = null;
+    if(IS_THIRD_PARTY){
+      const res = await fetch('/api/third-party-items?name=' + encodeURIComponent(PRODUCT_NAME));
+      const data = await res.json();
+      if(data.success && data.items && data.items.length > 0) pub = !!data.items[0].published;
+    } else {
+      const res = await fetch('/api/products/' + encodeURIComponent(PRODUCT_NAME));
+      const data = await res.json();
+      if(data.success && data.product) pub = !!data.product.published;
+    }
+    if(pub === null) return;
+    // Set BOTH states explicitly: a published product can be unpublished right
+    // away; an unpublished one stays locked until this session's Save enables it.
+    updatePublishBtn(pub);
+    updateThirdPublishBtn(pub);
+    if(pub) enablePublishBtn(); else disablePublishBtn();
+  }catch(e){}
+}
+
+function showPublishedDialog(){
+  document.getElementById('publishDoneModal').style.display='flex';
+}
+
+// One-shot publish for THIS product. The publish endpoint is a BLIND TOGGLE, so
+// this must only ever be called while the product is unpublished.
+async function publishFormula(){
+  try{
+    if(IS_THIRD_PARTY){
+      const itemRes = await fetch('/api/third-party-items?name=' + encodeURIComponent(PRODUCT_NAME));
+      const itemData = await itemRes.json();
+      if(!(itemData.success && itemData.items && itemData.items.length > 0)){
+        return {ok:false, published:SHEET_PUBLISHED, error:'3rd Party item not found'};
+      }
+      const res = await fetch('/api/third-party-items/' + itemData.items[0].id + '/publish', {method:'POST'});
+      const data = await res.json();
+      return {ok: !!(res.ok && data.success), published: !!data.published, error: data.error};
+    }
+    const res = await fetch('/api/products/' + encodeURIComponent(PRODUCT_NAME) + '/publish', {method:'POST'});
+    const data = await res.json();
+    return {ok: !!(res.ok && data.success), published: !!data.published, error: data.error};
+  }catch(e){ return {ok:false, published:SHEET_PUBLISHED, error:e.message}; }
+}
+
+async function togglePublish(){
+  try{
+    const srcBtn = IS_THIRD_PARTY ? document.getElementById('thirdPublishBtn') : document.getElementById('publishBtn');
+    if(srcBtn && srcBtn.classList.contains('published')){
+      if(!confirm('Hide "' + PRODUCT_NAME + '" from the user portal?\n\nUsers will no longer see it and cannot update it until it is published again.')) return;
+    }
+    const r = await publishFormula();
+    if(!r.ok){ showSheetToast(r.error || 'Publish failed', false); return; }
+    updatePublishBtn(r.published);
+    updateThirdPublishBtn(r.published);
+    if(r.published){
+      showPublishedDialog();
+      enablePublishBtn();
+    } else {
+      disablePublishBtn();
+      showSheetToast(PRODUCT_NAME + ' unpublished');
+    }
+  }catch(e){ showSheetToast('Publish error: ' + e.message, false); }
+}
+
+function updatePublishBtn(isPublished){
+  SHEET_PUBLISHED = !!isPublished;
+  const btn = document.getElementById('publishBtn');
+  if(!btn) return;
+  if(isPublished){
+    btn.classList.add('published');
+    btn.innerHTML = '<i class="fas fa-globe"></i> Published';
+    btn.title = 'Currently published — click to unpublish';
+  }else{
+    btn.classList.remove('published');
+    btn.innerHTML = '<i class="fas fa-globe"></i> Publish';
+    btn.title = 'Publish this formula so it shows on the user side';
+  }
+}
+
+function updateThirdPublishBtn(isPublished){
+  SHEET_PUBLISHED = !!isPublished;
+  const btn = document.getElementById('thirdPublishBtn');
+  if(!btn) return;
+  if(isPublished){
+    btn.classList.add('published');
+    btn.innerHTML = '<i class="fas fa-globe"></i> Published';
+  }else{
+    btn.classList.remove('published');
+    btn.innerHTML = '<i class="fas fa-globe"></i> Publish';
+  }
+}
+
+function disablePublishBtn(){
+  const pb = document.getElementById('publishBtn');
+  if(pb){ pb.disabled=true; pb.style.opacity='0.5'; pb.style.cursor='not-allowed'; }
+  const tb = document.getElementById('thirdPublishBtn');
+  if(tb){ tb.disabled=true; tb.style.opacity='0.5'; tb.style.cursor='not-allowed'; }
+}
+
+function enablePublishBtn(){
+  const pb = document.getElementById('publishBtn');
+  if(pb){ pb.disabled=false; pb.style.opacity='1'; pb.style.cursor='pointer'; }
+  const tb = document.getElementById('thirdPublishBtn');
+  if(tb){ tb.disabled=false; tb.style.opacity='1'; tb.style.cursor='pointer'; }
+}
+
+function exportProductionFormula() {
+    const productName = "{{ selected_list }}";
+    if (!productName) {
+        alert("Please select a product first");
+        return;
+    }
+    window.location.href = "/api/production-formula/export?product_name=" + encodeURIComponent(productName);
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  loadPublishState();
+  const pubBtn = document.getElementById('publishBtn');
+  if(pubBtn) pubBtn.addEventListener('click', togglePublish);
+  const tpBtn = document.getElementById('thirdPublishBtn');
+  if(tpBtn) tpBtn.addEventListener('click', togglePublish);
+});
+</script>
+{% endblock %}

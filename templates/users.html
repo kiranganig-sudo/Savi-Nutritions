@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+{% block title %}User Access{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>User Access</span></div>
+        <h1 class="page-title">User Access</h1>
+        <div class="page-subtitle">Two fixed admin members for the admin portal, plus the user accounts you create for the user portal.</div>
+    </div>
+    <button class="btn btn-primary" id="btnCreateUser" type="button"><i class="fas fa-user-plus" style="margin-right:7px;"></i>Create User</button>
+</div>
+
+{% if created %}
+<div class="alert alert-success" style="margin-bottom:16px;">
+    <i class="fas fa-check-circle"></i> User account created. They can now log in to the user portal with the Login ID and the password you set.
+</div>
+{% endif %}
+{% if deleted %}
+<div class="alert alert-success" style="margin-bottom:16px;">
+    <i class="fas fa-check-circle"></i> User account deleted.
+</div>
+{% endif %}
+{% if error %}
+<div class="alert alert-danger" style="margin-bottom:16px;">
+    <i class="fas fa-exclamation-triangle"></i> {{ error }}
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title"><i class="fas fa-user-shield" style="color:var(--primary);margin-right:8px;"></i> Admin Members ({{ users|length }})</div>
+        <span class="badge badge-primary">fixed — cannot be changed</span>
+    </div>
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Sl No</th>
+                    <th>Name</th>
+                    <th>Login ID</th>
+                    <th>Password</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td><strong>{{ u.full_name }}</strong></td>
+                    <td>{{ u.login_id }}</td>
+                    <td class="pw-cell">{% include "_password_reveal.html" %}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" style="text-align:center;color:#8a938d;padding:26px;">No admin members registered.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+    <div class="card-header">
+        <div class="card-title"><i class="fas fa-users" style="color:var(--primary);margin-right:8px;"></i> User Portal Accounts ({{ portal_users|length }})</div>
+        <span class="badge badge-success">{{ portal_users|length }} user(s)</span>
+    </div>
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Sl No</th>
+                    <th>Name</th>
+                    <th>Login ID</th>
+                    <th>Password</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in portal_users %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td><strong>{{ u.full_name }}</strong></td>
+                    <td>{{ u.login_id }}</td>
+                    <td class="pw-cell">{% include "_password_reveal.html" %}</td>
+                    <td>
+                        <form method="post" action="{{ url_for('users_delete', user_id=u.id) }}" onsubmit="return confirm('Delete this user account ({{ u.full_name }})?');" style="display:inline;">
+                            <button class="btn btn-outline-danger btn-sm" type="submit"><i class="fas fa-trash-can"></i> Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" style="text-align:center;color:#8a938d;padding:26px;">No user accounts yet. Click "Create User" to add one.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal-overlay" id="createUserModal" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.45);align-items:center;justify-content:center;z-index:3000;padding:20px;">
+    <div style="background:#fff;border-radius:12px;width:100%;max-width:460px;padding:22px;box-shadow:0 20px 50px rgba(0,0,0,.3);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+            <h3 style="margin:0;font-size:16px;color:#123c22;"><i class="fas fa-user-plus" style="color:var(--primary);margin-right:8px;"></i>Create User Account</h3>
+            <button type="button" data-close-modal style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text-light);" aria-label="Close">&times;</button>
+        </div>
+        <form method="post" action="{{ url_for('users') }}">
+            <div class="form-group"><label class="form-label">Name *</label><input type="text" name="full_name" required class="form-control" placeholder="Enter name" autocomplete="off" data-con="name"></div>
+            <div class="form-group"><label class="form-label">Login ID *</label><input type="text" name="login_id" id="newUserLoginId" required class="form-control" inputmode="numeric" title="Exactly 6 digits (numbers only) - a 7th digit is refused" placeholder="6 digits, e.g. 000123" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"><div id="newUserLoginIdHint" style="font-size:12px;color:#66756c;margin-top:6px;"><i class="fas fa-info-circle"></i> Exactly 6 digits (numbers only). Only 6 can be entered - a 7th digit is refused before it is typed.</div></div>
+            <div class="form-group"><label class="form-label">Password *</label><input type="text" name="password" id="newUserPassword" required class="form-control" inputmode="numeric" title="Exactly 6 digits (numbers only) - a 7th digit is refused" placeholder="6 digits, e.g. 000456" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"><div id="newUserPasswordHint" style="font-size:12px;color:#66756c;margin-top:6px;"><i class="fas fa-info-circle"></i> Exactly 6 digits (numbers only). Only 6 can be entered - a 7th digit is refused before it is typed.</div></div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+                <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-check" style="margin-right:6px;"></i>Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.pw-cell{white-space:nowrap;}
+.pw-reveal{display:inline-flex;align-items:center;gap:6px;}
+.pw-reveal .pw-dots,.pw-reveal .pw-plain{
+    background:#f2f6f3;border:1px solid #dbe6df;padding:3px 9px;border-radius:6px;
+    font-size:12.5px;font-family:inherit;color:#123c22;letter-spacing:.04em;
+}
+.pw-reveal .pw-plain{background:#fff;border-color:#c9dccf;}
+.pw-eye{
+    background:none;border:0;color:#7b8a81;cursor:pointer;font-size:14px;
+    padding:3px 5px;line-height:1;border-radius:5px;
+}
+.pw-eye:hover{color:#1c5c37;background:#eef5f0;}
+</style>
+
+<script>
+/* Passwords sit masked behind the eye button in BOTH User Access tables.
+   Clicking reveals, clicking again re-masks. */
+document.querySelectorAll('.pw-reveal .pw-eye').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        var wrap = btn.closest('.pw-reveal');
+        var dots = wrap.querySelector('.pw-dots');
+        var plain = wrap.querySelector('.pw-plain');
+        var show = plain.style.display === 'none';
+        plain.style.display = show ? '' : 'none';
+        dots.style.display = show ? 'none' : '';
+        btn.innerHTML = show ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+        btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+        btn.setAttribute('title', show ? 'Hide password' : 'Show password');
+    });
+});
+</script>
+
+<script>
+/* Create User: Login ID and Password take exactly 6 digits and nothing more.
+   A 7th digit (or any letter) is REFUSED before it reaches the field, so
+   whatever is already there is never rewritten or trimmed - Change #30 keeps a
+   wrong value visible and refused instead of silently cutting 1234567 into a
+   different, valid 123456. Every refusal is announced in the field's hint so
+   the cap is never invisible. The submit guard and the server's
+   re.fullmatch(r'\d{6}', ...) stay as the final judges. */
+var sixResets = {};
+function bindSixDigits(el, hintId, label) {
+    var hint = document.getElementById(hintId);
+    var baseHtml = hint ? hint.innerHTML : '';
+    var baseColor = hint ? hint.style.color : '';      /* inline colour to restore, not '' */
+    function refuse(msg) {
+        if (hint) { hint.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + msg; hint.style.color = '#b3251f'; }
+        el.style.borderColor = '#b3251f';
+    }
+    function normal() {
+        if (hint) { hint.innerHTML = baseHtml; hint.style.color = baseColor; }
+        el.style.borderColor = '';
+    }
+    function bad(t) { return t.length > 6 || !/^[0-9]*$/.test(t); }
+    function pos() {
+        var s = el.selectionStart, e = el.selectionEnd;
+        return (typeof s === 'number') ? [s, e] : [el.value.length, el.value.length];
+    }
+    sixResets[el.id] = normal;
+    el.addEventListener('keydown', function (e) {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        var k = e.key;
+        if (!k || k.length !== 1) return;                 /* Backspace / arrows / F-keys */
+        if (!/^[0-9]$/.test(k)) {
+            e.preventDefault();
+            refuse(label + ' takes numbers only (0-9).');
+            return;
+        }
+        var p = pos();
+        var next = el.value.slice(0, p[0]) + el.value.slice(p[1]);
+        if (next.length + 1 > 6) {
+            e.preventDefault();
+            refuse(label + ' is exactly 6 digits - a 7th digit is not accepted.');
+        }
+    });
+    /* Catches everything a keystroke does not: paste, drop, autofill and
+       execCommand. Deletions/undo/redo are never blocked. */
+    el.addEventListener('beforeinput', function (e) {
+        var t = e.inputType || '';
+        if (t.indexOf('insert') !== 0) return;
+        if (e.data == null) return;                    /* unknown content - input() reports it */
+        var p = pos();
+        var next = el.value.slice(0, p[0]) + String(e.data) + el.value.slice(p[1]);
+        if (bad(next)) {
+            e.preventDefault();
+            refuse((t === 'insertFromPaste' || t === 'insertFromDrop')
+                ? 'Paste refused - ' + label + ' takes exactly 6 digits (0-9).'
+                : label + ' is exactly 6 digits - a 7th digit is not accepted.');
+        }
+    });
+    /* Safety net for browsers/paths that skip beforeinput. It only REPORTS:
+       the value is left exactly as it is, so nothing is ever auto-corrected. */
+    el.addEventListener('input', function () {
+        if (bad(el.value)) {
+            refuse(label + ' must be exactly 6 digits (0-9). Nothing was changed for you - fix it before saving.');
+        } else {
+            normal();
+        }
+    });
+}
+bindSixDigits(document.getElementById('newUserLoginId'), 'newUserLoginIdHint', 'Login ID');
+bindSixDigits(document.getElementById('newUserPassword'), 'newUserPasswordHint', 'Password');
+document.getElementById('btnCreateUser').addEventListener('click', function () {
+    document.getElementById('createUserModal').style.display = 'flex';
+    ['newUserLoginId', 'newUserPassword'].forEach(function (id) {
+        var el = document.getElementById(id);
+        el.value = '';
+        if (sixResets[id]) sixResets[id]();
+    });
+});
+/* Login ID and Password are both validated, never rewritten: stripping letters
+   or cutting the value to 6 characters silently turned a wrong value into a
+   different, valid one. The input guard above refuses the extra digit instead,
+   and this submit guard is the backstop. */
+document.getElementById('createUserModal').querySelector('form').addEventListener('submit', function (e) {
+    var idEl = document.getElementById('newUserLoginId');
+    var idRaw = (idEl.value || '').trim();
+    if (!/^[0-9]{6}$/.test(idRaw)) {
+        e.preventDefault();
+        alert(idRaw
+            ? 'Login ID must be exactly 6 digits (numbers only) — nothing is auto-corrected, so it is matched exactly as typed.'
+            : 'Login ID is required (6 digits, numbers only).');
+        idEl.focus();
+        return;
+    }
+    var pwEl = document.getElementById('newUserPassword');
+    var pwRaw = (pwEl.value || '').trim();
+    if (!/^[0-9]{6}$/.test(pwRaw)) {
+        e.preventDefault();
+        alert(pwRaw
+            ? 'Password must be exactly 6 digits (numbers only) — nothing is auto-corrected, so it is matched exactly as typed.'
+            : 'Password is required (6 digits, numbers only).');
+        pwEl.focus();
+    }
+});
+document.querySelectorAll('[data-close-modal]').forEach(function (b) {
+    b.addEventListener('click', function () {
+        document.getElementById('createUserModal').style.display = 'none';
+    });
+});
+document.getElementById('createUserModal').addEventListener('click', function (e) {
+    if (e.target === this) this.style.display = 'none';
+});
+</script>
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Shift Login{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Shift Login</span></div>
+        <h1 class="page-title">Shift Login <small style="font-weight:400;color:var(--text-light);font-size:13px;">(optional — used to tag morning/night production)</small></h1>
+        <div class="page-subtitle">Log in with one of the two operator accounts to tag your production entries with a shift.</div>
+    </div>
+</div>
+
+{% if logged_in %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Signed in</div>
+    </div>
+    <div class="card-body" style="padding:22px;">
+        <div class="empty-state">
+            <i class="fas fa-user-check" style="font-size:38px;color:{% if shift == 'morning' %}#e8a33d;{% else %}#3a5a75;{% endif %}"></i>
+            <h3>You are logged in as <strong>{{ user_name }}</strong></h3>
+            <p>Shift: <strong style="color:{% if shift == 'morning' %}#e8a33d;{% else %}#3a5a75;{% endif %}">{{ 'Morning' if shift == 'morning' else 'Night' }}</strong></p>
+            <p style="color:var(--text-light);">This is optional. Your production entries will be tagged as <strong>{{ 'Morning' if shift == 'morning' else 'Night' }}</strong>.</p>
+        </div>
+        <div style="text-align:center;margin-top:8px;">
+            <a class="btn btn-dark" href="{{ url_for('shift_logout') }}"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="card" style="max-width:440px;">
+    <div class="card-header">
+        <div class="card-title">Operator Login</div>
+    </div>
+    <div class="card-body" style="padding:22px;">
+        <form method="post" action="{{ url_for('shift_login') }}" autocomplete="off">
+            <div class="form-group">
+                <label class="form-label">Name</label>
+                <input class="form-control" name="name" id="loginName" placeholder="e.g. shashank" required maxlength="80">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Password (6 characters)</label>
+                <input class="form-control" name="password" id="loginPassword" type="password" placeholder="MOR123 or NIG321" required maxlength="6" oninput="this.value=this.value.toUpperCase();formatLoginPassword()">
+                <div style="font-size:11px;color:var(--text-light);margin-top:4px;">MOR + 3 digits = Morning · NIG + 3 digits = Night</div>
+            </div>
+            {% if error %}<div style="background:#fbecec;color:#b44747;border:1px solid #f3d3d3;border-radius:8px;padding:9px 12px;font-size:12.5px;margin-bottom:12px;">{{ error }}</div>{% endif %}
+            <button class="btn btn-primary" type="submit" style="width:100%;"><i class="fas fa-sign-in-alt"></i> Login</button>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<script>
+function formatLoginPassword(){
+  const el = document.getElementById('loginPassword');
+  const v = el.value;
+  if(v.length > 3){
+    const code = v.slice(0,3);
+    const digits = v.slice(3).replace(/[^0-9]/g,'');
+    el.value = code + digits;
+  }
+}
+</script>
+{% endblock %}

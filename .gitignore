@@ -1,0 +1,107 @@
+# =============================================================================
+# Savi Nutrition — .gitignore
+# Keep this file at the project root. Anything listed here will NEVER be
+# tracked by Git, even if you accidentally `git add` it.
+#
+# SECURE by default (never push these):
+#   *.db            SQLite databases (password hashes, all user/data)
+#   *.bak           Database backups
+#   *.log           Log files (may contain stack traces / sensitive data)
+#   .env            Real environment file (SECRET_KEY, DB credentials)
+# =============================================================================
+
+# --- SQLite databases & backups (MOST SENSITIVE) ---
+*.db
+*.db.bak
+*.bak
+*.sqlite
+*.sqlite3
+
+# --- Log files ---
+*.log
+
+# --- Environment / secrets ---
+.env
+.env.local
+.env.*.local
+config/.env
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*
+secrets*
+
+# --- Python cache ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# --- IDE / OS ---
+.idea/
+.vscode/
+*.swp
+*.swo
+~*
+.DS_Store
+Thumbs.db
+
+# --- Deployment / runtime ---
+node_modules/
+uploads/
+backups/
+
+# --- Project-internal duplicate tree (do not push) ---
+SaviNutrition-Production/
+
+# --- Local-only project notes (contain admin credentials + contact details) ---
+AGENTS.md
+
+# --- Temporary probe / test scripts ---
+probe_*.py
+debug_*.py
+check_*.py
+e2e_*.py
+verify_*.py
+anchor_*.py
+
+# --- Restart / server scripts (sensitive paths inside) ---
+restart_*.py
+restart_*.ps1
+
+# --- Server stdout/stderr logs ---
+run_*_err.log
+run_*_out.log
+*_start_stderr.log
+*_start_stdout.log
+*_stderr*.log
+*_stdout*.log
+*_err.log
+admin_stderr*.log
+admin_stdout*.log
+user_stderr*.log
+user_stdout*.log
+admin_start_stderr.log
+admin_start_stdout.log
+user_start_stderr.log
+user_start_stdout.log
+
+# --- Database migration / seed backups ---
+*.prezero.*.bak
+*.pre_vendor_clear.*.bak
+
+# --- Local secret/backup files that must NEVER be pushed (found 2026-09-28:
+#     SAVE_TO_GITHUB.bat runs `git add -A`, which would have leaked the live
+#     TiDB password + SECRET_KEY and a full DB dump with user passwords) ---
+Vercel_Env_Values.txt
+TiDB_backup_before_wipe.json
+*_Env_Values.txt
+TiDB_backup*.json
+
+# --- Built launcher binary (regenerate from desktop_app.py) ---
+SaviNutrition.exe

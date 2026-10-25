@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Production Formula{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a><i class="fas fa-chevron-right"></i><span>Production Formula</span>{% if selected_product %}<i class="fas fa-chevron-right"></i><span>{{ selected_product }}</span>{% endif %}</div>
+        <h1 class="page-title">Production Formula</h1>
+        <div class="page-subtitle">{% if selected_product %}View the default machine quantities for {{ selected_product }}.{% else %}Select a product from the Production Formula menu.{% endif %}</div>
+    </div>
+</div>
+{% if selected_product %}
+<div class="card">
+    <div class="card-header"><div><h3 style="margin:0 0 4px;">{{ selected_product }}</h3><div style="color:#66756c;font-size:13px;">Default machine quantities (view only)</div></div>
+        <div class="export-actions" style="margin-top:8px;">
+            <button class="btn btn-secondary btn-sm" onclick="exportProductionFormula()"><i class="fas fa-download"></i> Export Excel</button>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="formulaTable"><thead><tr><th>S.No</th><th>Material</th><th>Old Machine Quantity</th><th>New Machine Quantity</th></tr></thead>
+        <tbody>{% for row in formula_materials %}
+        <tr><td>{{ loop.index }}</td><td><strong>{{ row.material }}</strong></td>
+            <td><strong>{{ row.old_machine|default(0, true) }} kg</strong></td>
+            <td><strong>{{ row.new_machine|default(0, true) }} kg</strong></td>
+        </tr>{% else %}<tr><td colspan="4"><div class="empty-state"><h3>No materials found</h3><p>No materials are currently listed for this product.</p></div></td></tr>{% endfor %}</tbody></table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function exportProductionFormula() {
+    const productName = "{{ selected_product }}";
+    if (!productName) {
+        alert("Please select a product first");
+        return;
+    }
+    window.location.href = "{{ request.script_root }}/api/production-formula/export?product_name=" + encodeURIComponent(productName);
+}
+</script>
+{% endblock %}

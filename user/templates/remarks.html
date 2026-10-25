@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+{% block title %}Remarks{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb"><a href="{{ url_for('dashboard') }}">Home</a> <i class="fas fa-chevron-right"></i> <span>Remarks</span></div>
+        <h1 class="page-title">Remarks</h1>
+        <div class="page-subtitle">Record payment remarks against sales. New balance = current balance - amount received, and the sale's Balance Amount updates.</div>
+    </div>
+    <div class="export-actions" style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" type="button" onclick="exportTable(rmkVisibleTable(),'remarks_export')"><i class="fas fa-download"></i> Export</button>
+        <button class="btn btn-primary" type="button" onclick="openRmkModal()"><i class="fas fa-plus"></i> Add Remarks</button>
+    </div>
+</div>
+
+<div style="display:flex;gap:8px;margin-bottom:14px;">
+    <button class="btn btn-primary" id="tabRmBtn" type="button" onclick="switchTab('raw_material')">Raw Material Sales</button>
+    <button class="btn btn-secondary" id="tabPsBtn" type="button" onclick="switchTab('product')">Product Sales</button>
+</div>
+
+<div class="card" id="rmCard">
+    <div class="card-header">
+        <div class="card-title">Raw Material Sales Remarks</div>
+        <div class="filter-bar">
+            <div class="filter-input"><i class="fas fa-search"></i><input type="text" placeholder="Search remarks..." oninput="searchTable(this,'rmRemarksTable')" aria-label="Search raw material remarks"></div>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="rmRemarksTable">
+            <thead><tr><th>Sl.No</th><th>Invoice Number</th><th>Customer Name</th><th>Product</th><th>Total Amount (₹)</th><th>Amount Received (₹)</th><th>Balance (₹)</th><th>Date</th><th>Mode of Payment</th><th>Notes</th><th style="width:60px;">Action</th></tr></thead>
+            <tbody>
+            {% for r in rm_remarks %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ r.invoice_number or '—' }}</td>
+                    <td><strong>{{ r.customer_name or '—' }}</strong></td>
+                    <td>{{ r.product or '—' }}</td>
+                    <td>{{ r.total_amount }}</td>
+                    <td>{{ r.amount_received }}</td>
+                    <td>{{ r.balance }}</td>
+                    <td><strong>{{ r.date or '—' }}</strong></td>
+                    <td>{{ r.payment_mode or '—' }}</td>
+                    <td style="white-space:pre-wrap;max-width:240px;">{{ r.notes or '—' }}</td>
+                    <td><div class="row-actions"><button class="action-btn" type="button" title="Edit remark" style="color:#15599c;" onclick="editRmk({{ r.id }})"><i class="fas fa-pen"></i></button><button class="action-btn" type="button" title="Delete remark" style="color:#d32f2f;" onclick="deleteRmk({{ r.id }})"><i class="fas fa-trash"></i></button></div></td>
+                </tr>
+            {% else %}
+                <tr><td colspan="11"><div class="empty-state"><i class="fas fa-comment-dots"></i><h3>No raw material remarks yet</h3><p>Use "Add Remarks" to record a payment against a raw material sale.</p></div></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card" id="psCard" style="display:none;">
+    <div class="card-header">
+        <div class="card-title">Product Sales Remarks</div>
+        <div class="filter-bar">
+            <div class="filter-input"><i class="fas fa-search"></i><input type="text" placeholder="Search remarks..." oninput="searchTable(this,'psRemarksTable')" aria-label="Search product remarks"></div>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="psRemarksTable">
+            <thead><tr><th>Sl.No</th><th>Invoice Number</th><th>Customer Name</th><th>Product</th><th>Amount to be Paid (₹)</th><th>Amount Received (₹)</th><th>Balance (₹)</th><th>Date</th><th>Mode of Payment</th><th>Notes</th><th style="width:60px;">Action</th></tr></thead>
+            <tbody>
+            {% for r in ps_remarks %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ r.invoice_number or '—' }}</td>
+                    <td><strong>{{ r.customer_name or '—' }}</strong></td>
+                    <td>{{ r.product or '—' }}</td>
+                    <td>{{ r.total_amount }}</td>
+                    <td>{{ r.amount_received }}</td>
+                    <td>{{ r.balance }}</td>
+                    <td><strong>{{ r.date or '—' }}</strong></td>
+                    <td>{{ r.payment_mode or '—' }}</td>
+                    <td style="white-space:pre-wrap;max-width:240px;">{{ r.notes or '—' }}</td>
+                    <td><div class="row-actions"><button class="action-btn" type="button" title="Edit remark" style="color:#15599c;" onclick="editRmk({{ r.id }})"><i class="fas fa-pen"></i></button><button class="action-btn" type="button" title="Delete remark" style="color:#d32f2f;" onclick="deleteRmk({{ r.id }})"><i class="fas fa-trash"></i></button></div></td>
+                </tr>
+            {% else %}
+                <tr><td colspan="11"><div class="empty-state"><i class="fas fa-comment-dots"></i><h3>No product remarks yet</h3><p>Use "Add Remarks" to record a payment against a product sale.</p></div></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal-overlay" id="rmkModal" style="display:none;position:fixed;inset:0;background:rgba(15,30,20,.45);align-items:center;justify-content:center;z-index:100;padding:20px;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:560px;padding:22px;max-height:90vh;overflow-y:auto;">
+    <h3 style="margin:0 0 4px;" id="rmkModalTitle">Add Remarks</h3>
+    <p style="font-size:12px;color:#66756c;margin:0 0 16px;" id="rmkModalNote">Select an invoice to fetch the sale details, then enter the amount received.</p>
+    <div class="form-group"><label class="form-label">Invoice *</label>
+      <select class="form-control" id="rmkInvoice" onchange="rmkPick()">
+        <option value="" selected disabled>Select an invoice...</option>
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group"><label class="form-label">Customer Name</label>
+        <input class="form-control" id="rmkCustomer" readonly>
+      </div>
+      <div class="form-group"><label class="form-label">Product</label>
+        <input class="form-control" id="rmkProduct" readonly>
+      </div>
+      <div class="form-group"><label class="form-label" id="rmkTotalLabel">Total Amount (₹)</label>
+        <input class="form-control" id="rmkTotal" readonly>
+      </div>
+      <div class="form-group"><label class="form-label">Existing Amount Received (₹)</label>
+        <input class="form-control" id="rmkPrevReceived" readonly>
+      </div>
+      <div class="form-group" style="grid-column:1 / -1;"><label class="form-label">Existing Balance Amount (₹)</label>
+        <input class="form-control" id="rmkPrevBalance" readonly>
+      </div>
+      <div class="form-group"><label class="form-label">Amount Received (₹) *</label>
+        <input class="form-control" id="rmkAmount" type="number" min="0" step="any" placeholder="e.g. 5000" oninput="rmkCalc()">
+      </div>
+      <div class="form-group"><label class="form-label">Balance (₹)</label>
+        <input class="form-control" id="rmkBalance" readonly placeholder="Auto-filled">
+      </div>
+      <div class="form-group"><label class="form-label">Date *</label>
+        <input class="form-control" id="rmkDate" type="date">
+      </div>
+      <div class="form-group"><label class="form-label">Mode of Payment *</label>
+        <select class="form-control" id="rmkMode">
+          <option value="" selected disabled>Select mode</option>
+          <option>Cash</option>
+          <option>UPI</option>
+          <option>Bank Transfer</option>
+          <option>Card</option>
+          <option>Cheque</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <div class="form-group" style="grid-column:1 / -1;"><label class="form-label">Notes</label>
+        <textarea class="form-control" id="rmkNotes" rows="3" maxlength="5000"
+          placeholder="Type notes here (optional) - any extra details about this payment..."></textarea>
+        <div style="font-size:11px;color:#8a988f;margin-top:4px;">Optional. Up to 5000 characters.</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+      <button class="btn btn-secondary" onclick="closeModal('rmkModal')">Cancel</button>
+      <button class="btn btn-primary" id="rmkSaveBtn" onclick="saveRmk()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const RM_SALES = {{ rm_sales|tojson }};
+const PS_SALES = {{ ps_sales|tojson }};
+// Change #58: every remark row keyed for the Edit button prefill.
+const RMK_ROWS = {{ (rm_remarks + ps_remarks)|tojson }};
+let rmkType = 'raw_material';
+let editingRmk = null;
+function rmkList(){ return rmkType === 'raw_material' ? RM_SALES : PS_SALES; }
+function rmkVisibleTable(){ return rmkType === 'raw_material' ? 'rmRemarksTable' : 'psRemarksTable'; }
+function switchTab(t){
+  rmkType = t;
+  document.getElementById('rmCard').style.display = t === 'raw_material' ? '' : 'none';
+  document.getElementById('psCard').style.display = t === 'product' ? '' : 'none';
+  document.getElementById('tabRmBtn').className = 'btn ' + (t === 'raw_material' ? 'btn-primary' : 'btn-secondary');
+  document.getElementById('tabPsBtn').className = 'btn ' + (t === 'product' ? 'btn-primary' : 'btn-secondary');
+  document.getElementById('rmkTotalLabel').textContent = t === 'raw_material' ? 'Total Amount (₹)' : 'Amount to be Paid (₹)';
+}
+(function(){
+  const d = new Date();
+  const iso = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  document.getElementById('rmkDate').max = iso;
+})();
+function openRmkModal(){
+  editingRmk = null;
+  document.getElementById('rmkModalTitle').textContent = 'Add Remarks';
+  const sel = document.getElementById('rmkInvoice');
+  sel.innerHTML = '<option value="" selected disabled>Select an invoice...</option>';
+  rmkList().forEach(function(s){
+    const o = document.createElement('option');
+    o.value = String(s.id);
+    o.textContent = s.invoice || ('Sale #' + s.id);
+    sel.appendChild(o);
+  });
+  sel.value = '';
+  sel.disabled = false;
+  ['rmkCustomer','rmkProduct','rmkTotal','rmkPrevReceived','rmkPrevBalance','rmkAmount','rmkBalance'].forEach(function(id){
+    document.getElementById(id).value = '';
+  });
+  const d = new Date();
+  document.getElementById('rmkDate').value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  document.getElementById('rmkMode').value = '';
+  document.getElementById('rmkNotes').value = '';
+  document.getElementById('rmkModal').style.display = 'flex';
+}
+// Change #58: Edit a saved remark - same modal, invoice locked, PUT on save.
+function editRmk(id){
+  const r = RMK_ROWS.find(function(x){ return String(x.id) === String(id); });
+  if (!r) return;
+  openRmkModal();
+  editingRmk = String(id);
+  document.getElementById('rmkModalTitle').textContent = 'Edit Remarks';
+  const sel = document.getElementById('rmkInvoice');
+  sel.value = String(r.sale_id);
+  sel.disabled = true;   // a payment stays against its own sale
+  const sale = rmkList().find(function(s){ return String(s.id) === String(r.sale_id); });
+  document.getElementById('rmkCustomer').value = r.customer_name || '';
+  document.getElementById('rmkProduct').value = r.product || '';
+  document.getElementById('rmkTotal').value = String(r.total_amount || 0);
+  document.getElementById('rmkPrevReceived').value = sale ? String(sale.received || 0) : '';
+  // Balance BEFORE this payment = current sale balance + this payment,
+  // so the auto-calc keeps working exactly like the Add flow.
+  document.getElementById('rmkPrevBalance').value =
+      String((Number(r.balance) || 0) + (Number(r.amount_received) || 0));
+  document.getElementById('rmkAmount').value = String(r.amount_received || 0);
+  document.getElementById('rmkBalance').value = String(r.balance || 0);
+  const p = String(r.date || '').split('-');   // dd-mm-yyyy -> yyyy-mm-dd
+  if (p.length === 3){
+    document.getElementById('rmkDate').value = p[2] + '-' + p[1] + '-' + p[0];
+  }
+  document.getElementById('rmkMode').value = r.payment_mode || '';
+  document.getElementById('rmkNotes').value = r.notes || '';
+}
+function rmkPick(){
+  const id = document.getElementById('rmkInvoice').value;
+  const s = rmkList().find(function(x){ return String(x.id) === String(id); });
+  if (!s) return;
+  document.getElementById('rmkCustomer').value = s.customer || '';
+  document.getElementById('rmkProduct').value = s.product || '';
+  document.getElementById('rmkTotal').value = String(s.total || 0);
+  document.getElementById('rmkPrevReceived').value = String(s.received || 0);
+  document.getElementById('rmkPrevBalance').value = String(s.balance || 0);
+  document.getElementById('rmkAmount').value = '';
+  document.getElementById('rmkBalance').value = '';
+}
+function rmkCalc(){
+  const amtRaw = document.getElementById('rmkAmount').value;
+  const balEl = document.getElementById('rmkBalance');
+  if (amtRaw === ''){ balEl.value = ''; return; }
+  const amt = Number(amtRaw);
+  if (isNaN(amt)){ balEl.value = ''; return; }
+  const prev = Number(document.getElementById('rmkPrevBalance').value || 0);
+  balEl.value = String(prev - amt);
+}
+async function saveRmk(){
+  const id = document.getElementById('rmkInvoice').value;
+  if (!id){ alert('Invoice is required'); return; }
+  const amtRaw = document.getElementById('rmkAmount').value;
+  if (!amtRaw){ alert('Amount Received is required'); return; }
+  const amt = Number(amtRaw);
+  if (amt <= 0){ alert('Amount Received must be more than 0'); return; }
+  const prev = Number(document.getElementById('rmkPrevBalance').value || 0);
+  if (amt > prev){ alert('Amount Received cannot be more than the balance amount (' + prev + ')'); return; }
+  const dateIso = document.getElementById('rmkDate').value;
+  if (!dateIso){ alert('Date is required'); return; }
+  const mode = document.getElementById('rmkMode').value;
+  if (!mode){ alert('Mode of Payment is required'); return; }
+  const form = new FormData();
+  form.append('sale_type', rmkType);
+  form.append('sale_id', id);
+  form.append('amount_received', amtRaw);
+  form.append('date', dateIso.split('-').reverse().join('-'));
+  form.append('payment_mode', mode);
+  form.append('notes', document.getElementById('rmkNotes').value);
+  const saveBtn = document.getElementById('rmkSaveBtn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving...';
+  try {
+    let res;
+    try {
+      if (editingRmk){
+        res = await fetch('/api/remarks/' + editingRmk, {method: 'PUT', body: form});
+      } else {
+        res = await fetch('/api/remarks', {method: 'POST', body: form});
+      }
+    } catch (e) {
+      alert('Could not reach the server. Check your connection and try again.');
+      return;
+    }
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (e) {
+      alert('Server error (HTTP ' + res.status + '). Please try again.');
+      return;
+    }
+    if (!res.ok || !data.success){ alert(data.error || 'Unable to save'); return; }
+    location.reload();
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save';
+  }
+}
+async function deleteRmk(id){
+  if (!confirm('Delete this remark? The amount received will be added back to the sale balance.')) return;
+  try {
+    const res = await fetch('/api/remarks/' + id, {method: 'DELETE'});
+    let data = null;
+    try { data = await res.json(); } catch (e) {}
+    if (!res.ok || (data && data.success === false)){ alert((data && data.error) || 'Unable to delete'); return; }
+    location.reload();
+  } catch (e) {
+    alert('Could not reach the server. Check your connection and try again.');
+  }
+}
+switchTab('raw_material');
+</script>
+{% endblock %}
